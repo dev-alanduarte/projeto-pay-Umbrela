@@ -1,4 +1,6 @@
 import axios from 'axios';
+import http from 'http';
+import https from 'https';
 
 const BASE_URL = process.env.AGILIZE_BASE_URL || 'https://api.agilizepay.com';
 
@@ -17,7 +19,10 @@ export function getAgilizeAxios() {
       'client_id': clientId,
       'client_secret': clientSecret,
     },
-    timeout: 15000,
+    timeout: 30000,
+    // Força IPv4 e mantém conexões abertas
+    httpAgent: new http.Agent({ keepAlive: true, family: 4 }),
+    httpsAgent: new https.Agent({ keepAlive: true, family: 4 }),
   });
 
   return instance;

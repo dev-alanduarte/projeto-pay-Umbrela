@@ -1,9 +1,15 @@
 import 'dotenv/config';
+import dns from 'dns';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { createPixTransaction } from './agilizeClient.js';
+
+// Prioriza IPv4 para evitar problemas de conectividade em ambientes com IPv6
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (_) {}
 
 const app = express();
 
