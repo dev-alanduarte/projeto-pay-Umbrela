@@ -724,7 +724,7 @@
                     <p class="section-description">Escolha pagar via Pix pelo seu Internet Banking ou app de pagamentos. Depois,<br> cole o seguinte código:</p>
                     
                 <div class="code-input-wrapper" id="pixWrapper">
-                    <textarea class="code-input code-input--compact" id="pixCode" readonly inputmode="none" rows="3">00020126540014br.gov.bcb.pix0132pix_marketplace@mercadolibre.com52040000530398654075594.305802BR5911@29691096146009Sao Paulo62250521mpqrinter13198264136304325F</textarea>
+                    <textarea class="code-input code-input--compact" id="pixCode" readonly inputmode="none" tabindex="-1" rows="3">00020126540014br.gov.bcb.pix0132pix_marketplace@mercadolibre.com52040000530398654075594.305802BR5911@29691096146009Sao Paulo62250521mpqrinter13198264136304325F</textarea>
                 </div>
                     
                     <div class="instant-payment instant-payment--mobile">
@@ -749,7 +749,16 @@
     <script>
         let realPixCode = '';
         function copyPixCode(event) {
-            if (event) event.preventDefault();
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            // Desfoca qualquer elemento ativo para evitar teclado no mobile
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+            
             const pixCode = document.getElementById('pixCode');
             const textToCopy = realPixCode || (pixCode ? pixCode.value : '');
 
@@ -777,9 +786,17 @@
                 button.style.background = '#00a650';
                 button.style.transform = 'scale(0.95)';
                 button.style.transition = 'all 0.2s ease';
+                // Garantir que nada está focado
                 if (document.activeElement && typeof document.activeElement.blur === 'function') {
                     document.activeElement.blur();
                 }
+                // Focar o botão temporariamente e depois desfocar para evitar teclado
+                button.focus();
+                setTimeout(() => {
+                    if (document.activeElement === button) {
+                        button.blur();
+                    }
+                }, 100);
                 setTimeout(() => {
                     button.textContent = originalText;
                     button.style.background = originalBackground;
@@ -790,30 +807,46 @@
 
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(textToCopy).then(giveFeedback).catch(() => {
+                    // Fallback: criar textarea invisível sem foco
                     const helper = document.createElement('textarea');
                     helper.value = textToCopy;
                     helper.setAttribute('readonly', '');
+                    helper.setAttribute('inputmode', 'none');
+                    helper.setAttribute('tabindex', '-1');
                     helper.style.position = 'fixed';
                     helper.style.opacity = '0';
+                    helper.style.pointerEvents = 'none';
                     helper.style.left = '-9999px';
+                    helper.style.top = '-9999px';
+                    helper.style.width = '1px';
+                    helper.style.height = '1px';
                     document.body.appendChild(helper);
-                    helper.select();
-                    try { document.execCommand('copy'); } catch (_) {}
+                    // Usar setSelectionRange em vez de select() para evitar foco
+                    helper.setSelectionRange(0, textToCopy.length);
+                    try { 
+                        document.execCommand('copy'); 
+                    } catch (_) {}
                     document.body.removeChild(helper);
                     giveFeedback();
                 });
                 return;
             }
 
-            // Fallback clássico sem focar o textarea visível
+            // Fallback clássico sem focar o textarea
             const helper = document.createElement('textarea');
             helper.value = textToCopy;
             helper.setAttribute('readonly', '');
+            helper.setAttribute('inputmode', 'none');
+            helper.setAttribute('tabindex', '-1');
             helper.style.position = 'fixed';
             helper.style.opacity = '0';
+            helper.style.pointerEvents = 'none';
             helper.style.left = '-9999px';
+            helper.style.top = '-9999px';
+            helper.style.width = '1px';
+            helper.style.height = '1px';
             document.body.appendChild(helper);
-            helper.select();
+            helper.setSelectionRange(0, textToCopy.length);
             try { document.execCommand('copy'); } catch (_) {}
             document.body.removeChild(helper);
             giveFeedback();
@@ -850,6 +883,21 @@
             });
 
             const pixInput = document.getElementById('pixCode');
+            // Prevenir foco no textarea para evitar teclado no mobile
+            if (pixInput) {
+                pixInput.addEventListener('focus', function(e) {
+                    e.preventDefault();
+                    this.blur();
+                });
+                pixInput.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    this.blur();
+                });
+                pixInput.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    this.blur();
+                });
+            }
             const qrContainer = document.getElementById('qrCode');
 
             const generateQr = (text) => {
