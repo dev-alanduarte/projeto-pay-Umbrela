@@ -1067,8 +1067,13 @@
                         });
                     }
 
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    if (!resp.ok) {
+                        const errorText = await resp.text();
+                        console.error('❌ Erro na resposta:', resp.status, errorText);
+                        throw new Error(`HTTP ${resp.status}: ${errorText}`);
+                    }
                     const data = await resp.json();
+                    console.log('✅ Dados recebidos:', data);
 
                     const pixText = data.pixCopiaECola || data.qrCode || '';
                     if (pixText) {
