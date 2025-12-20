@@ -4,7 +4,13 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { createPixTransaction } from './agilizeClient.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createPixTransaction } from './umbrellapagClient.js';
+
+// Para usar __dirname em ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Prioriza IPv4 para evitar problemas de conectividade em ambientes com IPv6
 try {
@@ -22,6 +28,28 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
 
+// Servir arquivos estáticos do frontend
+const frontendPath = path.join(__dirname, '..', '..', 'frontend');
+app.use(express.static(frontendPath));
+
+// Middleware para tratar erros de JSON malformado
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('❌ Erro ao parsear JSON:', {
+      message: err.message,
+      stack: err.stack,
+      rawBody: req.body ? JSON.stringify(req.body).substring(0, 200) : 'vazio',
+    });
+    return res.status(400).json({ 
+      error: true,
+      message: 'JSON malformado na requisição',
+      details: err.message,
+      position: err.message.match(/position (\d+)/)?.[1] || 'desconhecido',
+    });
+  }
+  next();
+});
+
 app.get('/health', (req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
@@ -29,22 +57,371 @@ app.get('/health', (req, res) => {
 // Create PIX transaction (proxy)
 app.post('/pix', async (req, res) => {
   try {
-    const { code, amount, email, document, url } = req.body || {};
+    console.log('📥 POST /pix recebido:', JSON.stringify(req.body, null, 2));
+    
+    const { code, amount, email, document, url, hostname } = req.body || {};
     if (!code || amount == null || !email || !document || !url) {
-      return res.status(400).json({ message: 'Missing required fields: code, amount, email, document, url' });
+      console.error('❌ Campos obrigatórios faltando:', { code, amount, email, document, url });
+      return res.status(400).json({ 
+        error: true,
+        message: 'Missing required fields: code, amount, email, document, url',
+        received: { code, amount, email, document, url }
+      });
     }
 
-    const payload = { code, amount, email, document, url };
+    // Extrai hostname da URL se não fornecido
+    let finalHostname = hostname;
+    
+    // Remove protocolo (http:// ou https://) se presente
+    if (finalHostname) {
+      finalHostname = finalHostname.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    }
+    
+    if (!finalHostname && url) {
+      try {
+        const urlObj = new URL(url);
+        finalHostname = urlObj.hostname;
+        // Se for localhost, não usa (API não aceita)
+        if (finalHostname === 'localhost' || finalHostname === '127.0.0.1') {
+          finalHostname = null;
+        }
+      } catch (e) {
+        finalHostname = null;
+      }
+    }
+
+    // Se ainda não tiver hostname válido, usa o configurado no .env
+    if (!finalHostname) {
+      finalHostname = process.env.UMBRELLAPAG_HOSTNAME || null;
+      if (finalHostname) {
+        // Remove protocolo também do .env se presente
+        finalHostname = finalHostname.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      }
+    }
+    
+    // Valida se tem hostname antes de continuar
+    if (!finalHostname) {
+      return res.status(400).json({
+        error: true,
+        message: 'Hostname é obrigatório. Forneça via parâmetro "hostname" no body ou configure UMBRELLAPAG_HOSTNAME no .env',
+        hint: 'O hostname deve ser apenas o domínio (ex: app.umbrellapag.com), sem http:// ou https://',
+      });
+    }
+
+    const payload = { code, amount, email, document, url, hostname: finalHostname };
+    console.log('🔄 Processando payload:', payload);
+    console.log('🌐 Hostname extraído:', finalHostname);
+    
     const response = await createPixTransaction(payload);
+    console.log('✅ Resposta enviada ao cliente:', response);
+    
     return res.status(201).json(response);
   } catch (err) {
     const status = err.response?.status || 500;
     const data = err.response?.data || { message: err.message };
     // Log detailed provider error to help debugging
-    // eslint-disable-next-line no-console
-    console.error('Provider error:', {
+    console.error('❌ Erro no endpoint /pix:', {
       status,
-      data,
+      error: err.message,
+      responseData: data,
+      stack: err.stack,
+    });
+    return res.status(status).json({ error: true, ...data });
+  }
+});
+
+// Create PIX transaction via GET (parâmetros na URL)
+app.get('/pix', async (req, res) => {
+  try {
+    console.log('📥 GET /pix recebido - Query params:', JSON.stringify(req.query, null, 2));
+    
+    // Extrai parâmetros da URL (query parameters)
+    const { code, amount, email, document, url, hostname } = req.query || {};
+    
+    // Valida campos obrigatórios
+    if (!code || !amount || !email || !document) {
+      console.error('❌ Campos obrigatórios faltando:', { code, amount, email, document });
+      return res.status(400).json({ 
+        error: true,
+        message: 'Missing required query parameters: code, amount, email, document',
+        received: { code, amount, email, document },
+        example: '/pix?code=TESTE123&amount=20&email=cliente@gmail.com&document=07444082456&url=http://localhost:4001/webhook/umbrellapag&hostname=app.umbrellapag.com'
+      });
+    }
+
+    // Converte amount para número
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'Amount deve ser um número válido maior que zero',
+        received: amount
+      });
+    }
+
+    // URL do webhook (opcional, mas recomendado)
+    const webhookUrl = url || `http://localhost:4001/webhook/umbrellapag`;
+
+    // Extrai hostname da URL se não fornecido
+    let finalHostname = hostname;
+    
+    // Remove protocolo (http:// ou https://) se presente
+    if (finalHostname) {
+      finalHostname = finalHostname.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    }
+    
+    if (!finalHostname && webhookUrl) {
+      try {
+        const urlObj = new URL(webhookUrl);
+        finalHostname = urlObj.hostname;
+        // Se for localhost, não usa (API não aceita)
+        if (finalHostname === 'localhost' || finalHostname === '127.0.0.1') {
+          finalHostname = null;
+        }
+      } catch (e) {
+        finalHostname = null;
+      }
+    }
+    
+    // Se ainda não tiver hostname válido, usa o configurado no .env
+    if (!finalHostname) {
+      finalHostname = process.env.UMBRELLAPAG_HOSTNAME || null;
+      if (finalHostname) {
+        // Remove protocolo também do .env se presente
+        finalHostname = finalHostname.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      }
+    }
+    
+    // Valida se tem hostname antes de continuar
+    if (!finalHostname) {
+      return res.status(400).json({
+        error: true,
+        message: 'Hostname é obrigatório. Forneça via query parameter "hostname" ou configure UMBRELLAPAG_HOSTNAME no .env',
+        hint: 'O hostname deve ser apenas o domínio (ex: app.umbrellapag.com), sem http:// ou https://',
+        example: '/pix?code=TESTE123&amount=20&email=cliente@gmail.com&document=07444082456&hostname=app.umbrellapag.com'
+      });
+    }
+
+    const payload = { 
+      code, 
+      amount: amountNum, 
+      email, 
+      document, 
+      url: webhookUrl, 
+      hostname: finalHostname 
+    };
+    
+    console.log('🔄 Processando payload (GET):', payload);
+    console.log('🌐 Hostname extraído:', finalHostname);
+    
+    const response = await createPixTransaction(payload);
+    console.log('✅ Resposta enviada ao cliente (GET):', response);
+    
+    return res.status(200).json(response);
+  } catch (err) {
+    const status = err.response?.status || 500;
+    const data = err.response?.data || { message: err.message };
+    console.error('❌ Erro no endpoint GET /pix:', {
+      status,
+      error: err.message,
+      responseData: data,
+      stack: err.stack,
+    });
+    return res.status(status).json({ error: true, ...data });
+  }
+});
+
+// Rota simples: /:cliente/:produto/payment/:valor
+// Exemplo: http://localhost:4001/cliente/produto/payment/20.99
+app.get('/:cliente/:produto/payment/:valor', async (req, res) => {
+  try {
+    const { cliente, produto, valor } = req.params;
+    
+    // Se for requisição do navegador (não API), serve o HTML do frontend
+    const acceptsJson = req.headers.accept && req.headers.accept.includes('application/json');
+    if (!acceptsJson) {
+      return res.sendFile(path.join(frontendPath, 'page.html'));
+    }
+    
+    console.log('📥 GET /:cliente/:produto/payment/:valor recebido (API):', { cliente, produto, valor });
+    
+    // Converte valor para número
+    const amountNum = parseFloat(valor);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'Valor deve ser um número válido maior que zero',
+        received: valor
+      });
+    }
+
+    // Gera dados automaticamente baseado no cliente e produto
+    const code = `${cliente}_${produto}_${Date.now()}`;
+    const email = `${cliente}@cliente.com`;
+    const document = '07444082456'; // CPF padrão (pode ser configurável depois)
+    
+    // URL do webhook
+    const isDev = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+    const webhookUrl = isDev 
+      ? `http://localhost:4001/webhook/umbrellapag`
+      : `${req.protocol}://${req.get('host')}/webhook/umbrellapag`;
+
+    // Extrai hostname
+    let finalHostname = process.env.UMBRELLAPAG_HOSTNAME || null;
+    if (finalHostname) {
+      finalHostname = finalHostname.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    }
+    
+    // Se não tiver hostname configurado, tenta extrair da requisição
+    if (!finalHostname && !isDev) {
+      finalHostname = req.hostname;
+      if (finalHostname === 'localhost' || finalHostname === '127.0.0.1') {
+        finalHostname = null;
+      }
+    }
+    
+    // Em desenvolvimento, usa hostname padrão se não configurado
+    if (!finalHostname && isDev) {
+      finalHostname = process.env.UMBRELLAPAG_HOSTNAME || 'app.umbrellapag.com';
+      console.log('⚠️ Usando hostname padrão para desenvolvimento:', finalHostname);
+    }
+    
+    // Valida hostname
+    if (!finalHostname) {
+      return res.status(400).json({
+        error: true,
+        message: 'Hostname é obrigatório. Configure UMBRELLAPAG_HOSTNAME no .env',
+        hint: 'O hostname deve ser apenas o domínio (ex: app.umbrellapag.com), sem http:// ou https://',
+        example: 'Crie um arquivo .env na pasta backend/ com: UMBRELLAPAG_HOSTNAME=app.umbrellapag.com'
+      });
+    }
+
+    const payload = {
+      code,
+      amount: amountNum,
+      email,
+      document,
+      url: webhookUrl,
+      hostname: finalHostname
+    };
+    
+    console.log('🔄 Processando payload (rota simples):', payload);
+    
+    const response = await createPixTransaction(payload);
+    console.log('✅ Resposta enviada ao cliente (rota simples):', response);
+    
+    return res.status(200).json(response);
+  } catch (err) {
+    const status = err.response?.status || 500;
+    const data = err.response?.data || { message: err.message };
+    console.error('❌ Erro no endpoint GET /:cliente/:produto/payment/:valor:', {
+      status,
+      error: err.message,
+      responseData: data,
+      stack: err.stack,
+    });
+    return res.status(status).json({ error: true, ...data });
+  }
+});
+
+// Rota simples alternativa: /:cliente/:produto?payment=valor
+// Exemplo: http://localhost:4001/cliente/produto?payment=20.99
+app.get('/:cliente/:produto', async (req, res) => {
+  try {
+    const { cliente, produto } = req.params;
+    const { payment } = req.query;
+    
+    // Se for requisição do navegador (não API) e não tiver payment, serve o HTML
+    const acceptsJson = req.headers.accept && req.headers.accept.includes('application/json');
+    if (!acceptsJson && !payment) {
+      return res.sendFile(path.join(frontendPath, 'page.html'));
+    }
+    
+    console.log('📥 GET /:cliente/:produto recebido:', { cliente, produto, payment });
+    
+    // Valida payment (valor)
+    if (!payment) {
+      return res.status(400).json({
+        error: true,
+        message: 'Parâmetro "payment" é obrigatório',
+        example: `/${cliente}/${produto}?payment=20.99`
+      });
+    }
+
+    // Converte payment para número
+    const amountNum = parseFloat(payment);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'Payment deve ser um número válido maior que zero',
+        received: payment
+      });
+    }
+
+    // Gera dados automaticamente baseado no cliente e produto
+    const code = `${cliente}_${produto}_${Date.now()}`;
+    const email = `${cliente}@cliente.com`;
+    const document = '07444082456'; // CPF padrão (pode ser configurável depois)
+    
+    // URL do webhook
+    const isDev = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+    const webhookUrl = isDev 
+      ? `http://localhost:4001/webhook/umbrellapag`
+      : `${req.protocol}://${req.get('host')}/webhook/umbrellapag`;
+
+    // Extrai hostname
+    let finalHostname = process.env.UMBRELLAPAG_HOSTNAME || null;
+    if (finalHostname) {
+      finalHostname = finalHostname.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    }
+    
+    // Se não tiver hostname configurado, tenta extrair da requisição
+    if (!finalHostname && !isDev) {
+      finalHostname = req.hostname;
+      if (finalHostname === 'localhost' || finalHostname === '127.0.0.1') {
+        finalHostname = null;
+      }
+    }
+    
+    // Em desenvolvimento, usa hostname padrão se não configurado
+    if (!finalHostname && isDev) {
+      finalHostname = process.env.UMBRELLAPAG_HOSTNAME || 'app.umbrellapag.com';
+      console.log('⚠️ Usando hostname padrão para desenvolvimento:', finalHostname);
+    }
+    
+    // Valida hostname
+    if (!finalHostname) {
+      return res.status(400).json({
+        error: true,
+        message: 'Hostname é obrigatório. Configure UMBRELLAPAG_HOSTNAME no .env',
+        hint: 'O hostname deve ser apenas o domínio (ex: app.umbrellapag.com), sem http:// ou https://',
+        example: 'Crie um arquivo .env na pasta backend/ com: UMBRELLAPAG_HOSTNAME=app.umbrellapag.com'
+      });
+    }
+
+    const payload = {
+      code,
+      amount: amountNum,
+      email,
+      document,
+      url: webhookUrl,
+      hostname: finalHostname
+    };
+    
+    console.log('🔄 Processando payload (rota simples):', payload);
+    
+    const response = await createPixTransaction(payload);
+    console.log('✅ Resposta enviada ao cliente (rota simples):', response);
+    
+    return res.status(200).json(response);
+  } catch (err) {
+    const status = err.response?.status || 500;
+    const data = err.response?.data || { message: err.message };
+    console.error('❌ Erro no endpoint GET /:cliente/:produto:', {
+      status,
+      error: err.message,
+      responseData: data,
+      stack: err.stack,
     });
     return res.status(status).json({ error: true, ...data });
   }
@@ -181,13 +558,42 @@ app.get('/api/4', async (req, res) => {
   }
 });
 
-// Webhook receiver for Agilize
-app.post('/webhook/agilize', async (req, res) => {
+// Webhook receiver for UmbrellaPag
+app.post('/webhook/umbrellapag', async (req, res) => {
   // You can add verification/signature validation here if provided by the provider
   const event = req.body;
   // For now, just log and return 200 so provider considers it delivered
-  console.log('Agilize Webhook Received:', JSON.stringify(event));
+  console.log('UmbrellaPag Webhook Received:', JSON.stringify(event, null, 2));
   return res.status(200).json({ received: true });
+});
+
+// Mantém compatibilidade com o endpoint antigo (Agilize)
+app.post('/webhook/agilize', async (req, res) => {
+  // Redireciona para o handler UmbrellaPag
+  const event = req.body;
+  console.log('Agilize Webhook (legacy) Received:', JSON.stringify(event, null, 2));
+  return res.status(200).json({ received: true });
+});
+
+// Rota catch-all para servir o frontend (DEVE VIR POR ÚLTIMO - depois de todas as rotas de API)
+// Serve page.html para qualquer rota que não seja API
+// IMPORTANTE: Esta rota deve vir DEPOIS de todas as outras rotas GET
+app.get('*', (req, res, next) => {
+  // Se for uma rota de API conhecida, não serve o HTML (já foi tratada antes)
+  if (req.path.startsWith('/api/') || 
+      req.path === '/pix' || 
+      req.path.startsWith('/webhook/') ||
+      req.path === '/health') {
+    return res.status(404).json({ error: true, message: 'Not found' });
+  }
+  
+  // Serve o page.html para rotas do frontend (incluindo /cliente/produto/payment/valor)
+  res.sendFile(path.join(frontendPath, 'page.html'), (err) => {
+    if (err) {
+      console.error('Erro ao servir page.html:', err);
+      res.status(404).json({ error: true, message: 'Page not found' });
+    }
+  });
 });
 
 const port = Number(process.env.PORT || 4000);

