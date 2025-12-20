@@ -31,12 +31,12 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://http2.mlstatic.com"],
       fontSrc: ["'self'", "https://http2.mlstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
-      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:4001", "http://127.0.0.1:3000", "http://127.0.0.1:4001"],
+      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     },
   },
 }));
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:4001', 'http://127.0.0.1:4001'],
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://127.0.0.1:3001'],
   credentials: true
 }));
 app.use(express.json({ limit: '1mb' }));
@@ -159,7 +159,7 @@ app.get('/pix', async (req, res) => {
         error: true,
         message: 'Missing required query parameters: code, amount, email, document',
         received: { code, amount, email, document },
-        example: '/pix?code=TESTE123&amount=20&email=cliente@gmail.com&document=07444082456&url=http://localhost:4001/webhook/umbrellapag&hostname=app.umbrellapag.com'
+        example: '/pix?code=TESTE123&amount=20&email=cliente@gmail.com&document=07444082456&url=http://localhost:3001/webhook/umbrellapag&hostname=app.umbrellapag.com'
       });
     }
 
@@ -174,7 +174,7 @@ app.get('/pix', async (req, res) => {
     }
 
     // URL do webhook (opcional, mas recomendado)
-    const webhookUrl = url || `http://localhost:4001/webhook/umbrellapag`;
+    const webhookUrl = url || `http://localhost:3001/webhook/umbrellapag`;
 
     // Extrai hostname da URL se não fornecido
     let finalHostname = hostname;
@@ -246,7 +246,7 @@ app.get('/pix', async (req, res) => {
 });
 
 // Rota simples: /:cliente/:produto/payment/:valor
-// Exemplo: http://localhost:4001/cliente/produto/payment/20.99
+// Exemplo: http://localhost:3001/cliente/produto/payment/20.99
 app.get('/:cliente/:produto/payment/:valor', async (req, res) => {
   try {
     const { cliente, produto, valor } = req.params;
@@ -277,7 +277,7 @@ app.get('/:cliente/:produto/payment/:valor', async (req, res) => {
     // URL do webhook
     const isDev = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
     const webhookUrl = isDev 
-      ? `http://localhost:4001/webhook/umbrellapag`
+      ? `http://localhost:3001/webhook/umbrellapag`
       : `${req.protocol}://${req.get('host')}/webhook/umbrellapag`;
 
     // Extrai hostname
@@ -339,7 +339,7 @@ app.get('/:cliente/:produto/payment/:valor', async (req, res) => {
 });
 
 // Rota simples alternativa: /:cliente/:produto?payment=valor
-// Exemplo: http://localhost:4001/cliente/produto?payment=20.99
+// Exemplo: http://localhost:3001/cliente/produto?payment=20.99
 app.get('/:cliente/:produto', async (req, res) => {
   try {
     const { cliente, produto } = req.params;
@@ -380,7 +380,7 @@ app.get('/:cliente/:produto', async (req, res) => {
     // URL do webhook
     const isDev = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
     const webhookUrl = isDev 
-      ? `http://localhost:4001/webhook/umbrellapag`
+      ? `http://localhost:3001/webhook/umbrellapag`
       : `${req.protocol}://${req.get('host')}/webhook/umbrellapag`;
 
     // Extrai hostname
@@ -610,7 +610,7 @@ app.get('*', (req, res, next) => {
   });
 });
 
-const port = Number(process.env.PORT || 4001);
+const port = Number(process.env.PORT || 3001);
 app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`Backend running on http://localhost:${port}`);
