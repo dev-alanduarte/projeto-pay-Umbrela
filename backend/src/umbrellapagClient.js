@@ -75,7 +75,7 @@ async function createProduct(productData) {
 
   const { data } = await http.post('/api/user/products', form);
 
-  if (!data?.data?.uniqueProductLinkId) {
+  if (!(data && data.data && data.data.uniqueProductLinkId)) {
     throw new Error('Produto criado mas uniqueProductLinkId não retornado');
   }
 
@@ -106,7 +106,7 @@ async function createOrder(uniqueProductLinkId, hostname = null) {
 
   const { data } = await http.post(url);
 
-  if (!data?.data?.id) {
+  if (!(data && data.data && data.data.id)) {
     throw new Error('Pedido criado mas ID não retornado');
   }
 
@@ -206,16 +206,16 @@ async function createPayment(orderId, customerData, hostname = null) {
     
     console.log('✅ Pagamento criado - Resposta completa:', JSON.stringify(data, null, 2));
     console.log('✅ Pagamento criado - Resumo:', {
-      id: data.data?.id,
-      status: data.data?.order?.payment?.status,
-      hasPix: !!data.data?.order?.payment?.pix,
-      hasQrCode: !!data.data?.order?.payment?.qrCode,
-      qrCodeLength: data.data?.order?.payment?.qrCode?.length || 0,
-      pixKeys: data.data?.order?.payment?.pix ? Object.keys(data.data.order.payment.pix) : [],
+      id: (data.data && data.data.id),
+      status: (data.data && data.data.order && data.data.order.payment && data.data.order.payment.status),
+      hasPix: !!(data.data && data.data.order && data.data.order.payment && data.data.order.payment.pix),
+      hasQrCode: !!(data.data && data.data.order && data.data.order.payment && data.data.order.payment.qrCode),
+      qrCodeLength: (data.data && data.data.order && data.data.order.payment && data.data.order.payment.qrCode && data.data.order.payment.qrCode.length) || 0,
+      pixKeys: (data.data && data.data.order && data.data.order.payment && data.data.order.payment.pix) ? Object.keys(data.data.order.payment.pix) : [],
     });
     
     // Log da resposta completa para debug se recusado
-    if (data?.data?.order?.payment?.status === 'REFUSED') {
+    if ((data && data.data && data.data.order && data.data.order.payment && data.data.order.payment.status) === 'REFUSED') {
       console.error('❌ Pagamento RECUSADO - Detalhes:', {
         status: data.data.order.payment.status,
         refusedReason: data.data.order.payment.refusedReason,
@@ -223,7 +223,7 @@ async function createPayment(orderId, customerData, hostname = null) {
         gatewayId: data.data.order.payment.gatewayId,
         provider: data.data.order.payment.provider,
         payloadEnviado: JSON.stringify(paymentPayload, null, 2),
-        payloadInterno: JSON.stringify(data.data.order.payment.payload?.data || {}, null, 2),
+        payloadInterno: JSON.stringify((data.data.order.payment.payload && data.data.order.payment.payload.data) || {}, null, 2),
       });
       console.error('❌ Resposta COMPLETA da API:', JSON.stringify(data, null, 2));
     }
@@ -232,8 +232,8 @@ async function createPayment(orderId, customerData, hostname = null) {
   } catch (error) {
     console.error('❌ Erro ao criar pagamento:', {
       message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
+      response: (error.response && error.response.data),
+      status: (error.response && error.response.status),
       payloadEnviado: paymentPayload,
     });
     throw error;
@@ -344,8 +344,8 @@ async function createPixTransactionDirect(payload) {
   } catch (error) {
     console.error('❌ Erro ao criar transação PIX:', {
       message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
+      response: (error.response && error.response.data),
+      status: (error.response && error.response.status),
       payloadEnviado: transactionPayload,
     });
     throw error;
@@ -379,7 +379,7 @@ export async function createPixTransaction(payload) {
       const directResponse = await createPixTransactionDirect(payload);
       
       // Extrai dados do PIX da resposta direta
-      const pixData = directResponse.data?.pix || {};
+      const pixData = (directResponse.data && directResponse.data.pix) || {};
       const paymentData = directResponse.data || {};
       
       console.log('✅ Transação criada via método direto:', {
@@ -409,7 +409,7 @@ export async function createPixTransaction(payload) {
     } catch (directError) {
       console.warn('⚠️ Método direto falhou, tentando fluxo de checkout público...', {
         error: directError.message,
-        response: directError.response?.data,
+        response: (directError.response && directError.response.data),
       });
       
       // Fallback: usa o fluxo de checkout público
@@ -435,9 +435,9 @@ export async function createPixTransaction(payload) {
 
       // Extrai dados do PIX da resposta
       // A estrutura da resposta é: data.order.payment.pix e data.order.payment.qrCode
-      const pixData = paymentResponse.data?.order?.payment?.pix || {};
-      const paymentData = paymentResponse.data?.order?.payment || {};
-      const orderData = paymentResponse.data?.order || {};
+      const pixData = (paymentResponse.data && paymentResponse.data.order && paymentResponse.data.order.payment && paymentResponse.data.order.payment.pix) || {};
+      const paymentData = (paymentResponse.data && paymentResponse.data.order && paymentResponse.data.order.payment) || {};
+      const orderData = (paymentResponse.data && paymentResponse.data.order) || {};
       
       console.log('📊 Estrutura da resposta completa:', JSON.stringify({
         paymentStatus: paymentData.status,
@@ -509,9 +509,9 @@ export async function createPixTransaction(payload) {
   } catch (error) {
     console.error('❌ Erro na chamada UmbrellaPag:', {
       message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      headers: error.response?.headers,
+      response: (error.response && error.response.data),
+      status: (error.response && error.response.status),
+      headers: (error.response && error.response.headers),
     });
     throw error;
   }

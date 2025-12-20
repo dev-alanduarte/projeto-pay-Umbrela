@@ -117,8 +117,8 @@ app.post('/pix', async (req, res) => {
     
     return res.status(201).json(response);
   } catch (err) {
-    const status = err.response?.status || 500;
-    const data = err.response?.data || { message: err.message };
+    const status = (err.response && err.response.status) || 500;
+    const data = (err.response && err.response.data) || { message: err.message };
     // Log detailed provider error to help debugging
     console.error('❌ Erro no endpoint /pix:', {
       status,
@@ -219,8 +219,8 @@ app.get('/pix', async (req, res) => {
     
     return res.status(200).json(response);
   } catch (err) {
-    const status = err.response?.status || 500;
-    const data = err.response?.data || { message: err.message };
+    const status = (err.response && err.response.status) || 500;
+    const data = (err.response && err.response.data) || { message: err.message };
     console.error('❌ Erro no endpoint GET /pix:', {
       status,
       error: err.message,
@@ -312,8 +312,8 @@ app.get('/:cliente/:produto/payment/:valor', async (req, res) => {
     
     return res.status(200).json(response);
   } catch (err) {
-    const status = err.response?.status || 500;
-    const data = err.response?.data || { message: err.message };
+    const status = (err.response && err.response.status) || 500;
+    const data = (err.response && err.response.data) || { message: err.message };
     console.error('❌ Erro no endpoint GET /:cliente/:produto/payment/:valor:', {
       status,
       error: err.message,
@@ -415,8 +415,8 @@ app.get('/:cliente/:produto', async (req, res) => {
     
     return res.status(200).json(response);
   } catch (err) {
-    const status = err.response?.status || 500;
-    const data = err.response?.data || { message: err.message };
+    const status = (err.response && err.response.status) || 500;
+    const data = (err.response && err.response.data) || { message: err.message };
     console.error('❌ Erro no endpoint GET /:cliente/:produto:', {
       status,
       error: err.message,
