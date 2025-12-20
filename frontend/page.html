@@ -993,11 +993,13 @@
                     
                     // Configura a URL da API do backend
                     // Frontend roda na porta 3000, backend na porta 3001
+                    // Sempre usa o backend na porta 3001 (mesmo em produção)
                     const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                    // Sempre usa o backend na porta 3001
                     const backendUrl = isDev 
                         ? 'http://localhost:3001' 
                         : `${window.location.protocol}//${window.location.hostname}:3001`;
+                    
+                    console.log('🔧 Backend URL:', backendUrl);
                     
                     // Tenta usar rota simples /cliente/produto/payment/valor se houver cliente e produto no pathname
                     let apiUrl;
