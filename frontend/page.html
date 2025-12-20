@@ -992,8 +992,12 @@
                     }
                     
                     // Configura a URL da API do backend
-                    // Em desenvolvimento: usa porta 3001, em produção usa o mesmo origin
+                    // Frontend roda na porta 3000, backend na porta 3001
                     const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                    // Sempre usa o backend na porta 3001
+                    const backendUrl = isDev 
+                        ? 'http://localhost:3001' 
+                        : `${window.location.protocol}//${window.location.hostname}:3001`;
                     
                     // Tenta usar rota simples /cliente/produto/payment/valor se houver cliente e produto no pathname
                     let apiUrl;
@@ -1006,23 +1010,19 @@
                         const valorFromPath = pathParts[3];
                         // Usa o valor do path se disponível, senão usa o calculado
                         const valorFinal = valorFromPath ? parseFloat(valorFromPath) : amountReais;
-                        const baseUrl = isDev ? 'http://localhost:3001' : window.location.origin;
                         // Usa formato: /cliente/produto/payment/valor (com header Accept para API)
-                        apiUrl = `${baseUrl}/${cliente}/${produto}/payment/${valorFinal}`;
+                        apiUrl = `${backendUrl}/${cliente}/${produto}/payment/${valorFinal}`;
                         useSimpleRoute = true;
                     } else if (pathParts.length >= 2) {
                         // Tem cliente e produto no path: /cliente/produto
                         const cliente = pathParts[0];
                         const produto = pathParts[1];
-                        const baseUrl = isDev ? 'http://localhost:3001' : window.location.origin;
                         // Usa formato: /cliente/produto/payment/valor (com header Accept para API)
-                        apiUrl = `${baseUrl}/${cliente}/${produto}/payment/${amountReais}`;
+                        apiUrl = `${backendUrl}/${cliente}/${produto}/payment/${amountReais}`;
                         useSimpleRoute = true;
                     } else {
                         // Fallback para rota POST /pix (compatibilidade)
-                        apiUrl = isDev 
-                            ? `http://localhost:3001/pix` 
-                            : `${window.location.origin}/pix`;
+                        apiUrl = `${backendUrl}/pix`;
                     }
 
                     let resp;
@@ -1043,9 +1043,7 @@
                             amount: amountReais,
                             email: 'cliente2568@gmail.com',
                             document: getRandomCpf(),
-                            url: isDev 
-                                ? `http://localhost:3001/webhook/umbrellapag` 
-                                : `${window.location.origin}/webhook/umbrellapag`
+                            url: `${backendUrl}/webhook/umbrellapag`
                         };
                         resp = await fetch(apiUrl, {
                             method: 'POST',
