@@ -31,12 +31,12 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://http2.mlstatic.com"],
       fontSrc: ["'self'", "https://http2.mlstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
-      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
+      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:4001", "http://127.0.0.1:3000", "http://127.0.0.1:4001"],
     },
   },
 }));
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:4001', 'http://127.0.0.1:4001'],
   credentials: true
 }));
 app.use(express.json({ limit: '1mb' }));
@@ -610,7 +610,7 @@ app.get('*', (req, res, next) => {
   });
 });
 
-const port = Number(process.env.PORT || 4000);
+const port = Number(process.env.PORT || 4001);
 app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`Backend running on http://localhost:${port}`);
