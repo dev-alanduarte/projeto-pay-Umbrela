@@ -9,7 +9,7 @@ module.exports = {
     exec_mode: 'fork',
     env: {
       NODE_ENV: 'production',
-      PORT: 4001
+      PORT: 3001
     },
     // Configurações de log
     error_file: '../logs/pm2-error.log',
@@ -25,7 +25,7 @@ module.exports = {
     // Variáveis de ambiente (podem ser sobrescritas pelo .env)
     env_production: {
       NODE_ENV: 'production',
-      PORT: 4001
+      PORT: 3001
     }
   }]
 };

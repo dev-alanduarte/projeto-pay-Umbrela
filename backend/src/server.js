@@ -44,7 +44,7 @@ app.use((err, req, res, next) => {
       error: true,
       message: 'JSON malformado na requisição',
       details: err.message,
-      position: err.message.match(/position (\d+)/)?.[1] || 'desconhecido',
+      position: (err.message.match(/position (\d+)/) && err.message.match(/position (\d+)/)[1]) || 'desconhecido',
     });
   }
   next();
