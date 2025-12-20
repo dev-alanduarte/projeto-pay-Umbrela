@@ -44,6 +44,28 @@ app.use(morgan('dev'));
 
 // Servir arquivos estáticos do frontend
 const frontendPath = path.join(__dirname, '..', '..', 'frontend');
+
+// Rota específica para /produto (DEVE VIR ANTES do express.static)
+app.get('/produto', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'page.html'), (err) => {
+    if (err) {
+      console.error('Erro ao servir page.html:', err);
+      res.status(404).json({ error: true, message: 'Page not found' });
+    }
+  });
+});
+
+// Rota específica para /page.html (compatibilidade - DEVE VIR ANTES do express.static)
+app.get('/page.html', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'page.html'), (err) => {
+    if (err) {
+      console.error('Erro ao servir page.html:', err);
+      res.status(404).json({ error: true, message: 'Page not found' });
+    }
+  });
+});
+
+// Servir arquivos estáticos do frontend (DEVE VIR DEPOIS das rotas específicas)
 app.use(express.static(frontendPath));
 
 // Middleware para tratar erros de JSON malformado
@@ -611,9 +633,30 @@ app.get('*', (req, res, next) => {
 });
 
 const port = Number(process.env.PORT || 3001);
+const frontendPort = Number(process.env.FRONTEND_PORT || 3000);
+
 app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`Backend running on http://localhost:${port}`);
 });
+
+// Em desenvolvimento, também escuta na porta 3000 para servir o frontend com roteamento
+// Isso permite que /produto funcione localmente sem precisar do http-server separado
+if (process.env.NODE_ENV !== 'production' && port !== frontendPort && process.env.ENABLE_FRONTEND_PORT !== 'false') {
+  // Tenta escutar na porta 3000, mas não falha se já estiver em uso
+  const frontendServer = app.listen(frontendPort, () => {
+    // eslint-disable-next-line no-console
+    console.log(`Frontend (via backend) running on http://localhost:${frontendPort}`);
+    console.log(`✅ Acesse: http://localhost:${frontendPort}/produto?payment=29.99`);
+  });
+  
+  frontendServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`⚠️  Porta ${frontendPort} já está em uso. Pare o http-server na porta 3000 ou use: http://localhost:${port}/produto?payment=29.99`);
+    } else {
+      console.error('Erro ao iniciar servidor frontend:', err);
+    }
+  });
+}
 
 
