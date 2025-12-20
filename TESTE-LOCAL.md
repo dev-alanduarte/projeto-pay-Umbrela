@@ -1,7 +1,7 @@
 # 🧪 Guia de Teste Local
 
 ## Configuração Atual:
-- **Backend**: Porta 3001
+- **Backend**: Porta 4001
 - **Frontend**: Porta 3000
 
 ## Passo a Passo para Testar Localmente:
@@ -28,7 +28,7 @@ cd backend
 
 Adicione:
 ```env
-PORT=3001
+PORT=4001
 UMBRELLAPAG_API_KEY=sua_chave_aqui
 UMBRELLAPAG_HOSTNAME=app.umbrellapag.com
 ```
@@ -40,7 +40,7 @@ cd backend
 npm start
 ```
 
-Você deve ver: `Backend running on http://localhost:3001`
+Você deve ver: `Backend running on http://localhost:4001`
 
 ### 4. Iniciar Frontend (Terminal 2):
 
@@ -55,7 +55,7 @@ Você deve ver algo como: `Starting up http-server, serving ./`
 
 #### Backend:
 ```bash
-curl http://localhost:3001/health
+curl http://localhost:4001/health
 ```
 
 Deve retornar: `{"ok":true,"uptime":...}`
@@ -73,7 +73,7 @@ http://localhost:3000/page.html?payment=20.99
 
 ### 6. Verificar se está funcionando:
 
-- ✅ Backend responde em `http://localhost:3001/health`
+- ✅ Backend responde em `http://localhost:4001/health`
 - ✅ Frontend abre em `http://localhost:3000`
 - ✅ Frontend consegue fazer requisições para o backend
 - ✅ QR Code é gerado corretamente
@@ -84,7 +84,7 @@ http://localhost:3000/page.html?payment=20.99
 - Verifique se o backend está permitindo `http://localhost:3000` no CORS
 
 #### Erro de conexão:
-- Verifique se o backend está rodando na porta 3001
+- Verifique se o backend está rodando na porta 4001
 - Verifique o console do navegador (F12) para ver erros
 
 #### QR Code não aparece:
@@ -96,7 +96,7 @@ http://localhost:3000/page.html?payment=20.99
 ```bash
 # Ver processos rodando nas portas
 netstat -ano | findstr :3000
-netstat -ano | findstr :3001
+netstat -ano | findstr :4001
 
 # Parar processos (Windows)
 # Encontre o PID e use:
