@@ -956,7 +956,7 @@
             (async () => {
                 try {
                     const params = new URLSearchParams(window.location.search);
-                    const apiPort = params.get('apiPort') || '4001';
+                    const apiPort = params.get('apiPort') || '3001';
                     let amountReais = 10.00; // padrão
                     
                     // Extrai valor do pathname se for formato /cliente/produto/payment/valor
@@ -992,7 +992,7 @@
                     }
                     
                     // Configura a URL da API do backend
-                    // Em desenvolvimento: usa porta 4001, em produção usa o mesmo origin
+                    // Em desenvolvimento: usa porta 3001, em produção usa o mesmo origin
                     const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
                     
                     // Tenta usar rota simples /cliente/produto/payment/valor se houver cliente e produto no pathname
@@ -1006,7 +1006,7 @@
                         const valorFromPath = pathParts[3];
                         // Usa o valor do path se disponível, senão usa o calculado
                         const valorFinal = valorFromPath ? parseFloat(valorFromPath) : amountReais;
-                        const baseUrl = isDev ? 'http://localhost:4001' : window.location.origin;
+                        const baseUrl = isDev ? 'http://localhost:3001' : window.location.origin;
                         // Usa formato: /cliente/produto/payment/valor (com header Accept para API)
                         apiUrl = `${baseUrl}/${cliente}/${produto}/payment/${valorFinal}`;
                         useSimpleRoute = true;
@@ -1014,14 +1014,14 @@
                         // Tem cliente e produto no path: /cliente/produto
                         const cliente = pathParts[0];
                         const produto = pathParts[1];
-                        const baseUrl = isDev ? 'http://localhost:4001' : window.location.origin;
+                        const baseUrl = isDev ? 'http://localhost:3001' : window.location.origin;
                         // Usa formato: /cliente/produto/payment/valor (com header Accept para API)
                         apiUrl = `${baseUrl}/${cliente}/${produto}/payment/${amountReais}`;
                         useSimpleRoute = true;
                     } else {
                         // Fallback para rota POST /pix (compatibilidade)
                         apiUrl = isDev 
-                            ? `http://localhost:4001/pix` 
+                            ? `http://localhost:3001/pix` 
                             : `${window.location.origin}/pix`;
                     }
 
@@ -1044,7 +1044,7 @@
                             email: 'cliente2568@gmail.com',
                             document: getRandomCpf(),
                             url: isDev 
-                                ? `http://localhost:4001/webhook/umbrellapag` 
+                                ? `http://localhost:3001/webhook/umbrellapag` 
                                 : `${window.location.origin}/webhook/umbrellapag`
                         };
                         resp = await fetch(apiUrl, {

@@ -23,7 +23,18 @@ const app = express();
 // Em produção, considere usar banco de dados ou Redis
 const entregaStorage = new Map();
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://http2.mlstatic.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://http2.mlstatic.com"],
+      fontSrc: ["'self'", "https://http2.mlstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: ["'self'"],
+    },
+  },
+}));
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
