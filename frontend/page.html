@@ -1035,9 +1035,13 @@
                         apiUrl = `${backendUrl}/pix`;
                     }
 
+                    console.log('🔗 API URL:', apiUrl);
+                    console.log('📋 Use Simple Route:', useSimpleRoute);
+                    
                     let resp;
                     if (useSimpleRoute) {
                         // Usa GET na rota simples com Accept: application/json para indicar que é API
+                        console.log('📤 Fazendo requisição GET para:', apiUrl);
                         resp = await fetch(apiUrl, {
                             method: 'GET',
                             headers: { 
@@ -1045,6 +1049,7 @@
                                 'Accept': 'application/json'
                             }
                         });
+                        console.log('📥 Resposta recebida:', resp.status, resp.statusText);
                     } else {
                         // Usa POST na rota /pix (fallback)
                         const randomCode = `TESTE${Math.floor(Math.random()*1e6)}`;
