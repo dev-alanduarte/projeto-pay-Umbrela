@@ -1,9 +1,10 @@
 module.exports = {
   apps: [{
     name: 'projeto-pay-umbrela',
-    script: 'src/server.js',
+    script: 'npm',
+    args: 'start',
     cwd: './backend',
-    interpreter: 'node',
+    interpreter: 'none',
     instances: 1,
     exec_mode: 'fork',
     env: {
