@@ -17,13 +17,31 @@ cd /var/www/projeto-pay-umbrela
 # ou o caminho onde está seu projeto
 ```
 
-### 3. Fazer pull das mudanças do GitHub
+### 3. Resolver conflitos do Git (se houver)
+
+Se você receber um erro sobre mudanças locais que seriam sobrescritas:
+
+```bash
+# Opção 1: Salvar mudanças locais e fazer pull (recomendado)
+git stash push -m "Mudanças locais antes do pull"
+git pull origin main
+
+# Opção 2: Descartar mudanças locais (CUIDADO: você perderá as mudanças!)
+git reset --hard origin/main
+git pull origin main
+
+# Opção 3: Ver o que mudou localmente antes de decidir
+git status
+git diff
+```
+
+### 4. Fazer pull das mudanças do GitHub
 
 ```bash
 git pull origin main
 ```
 
-### 4. Instalar dependências (se necessário)
+### 5. Instalar dependências (se necessário)
 
 ```bash
 # Backend
@@ -37,7 +55,7 @@ npm install --production
 cd ..
 ```
 
-### 5. Reiniciar o backend com PM2
+### 6. Reiniciar o backend com PM2
 
 ```bash
 pm2 restart projeto-pay-umbrela-backend
@@ -45,7 +63,7 @@ pm2 restart projeto-pay-umbrela-backend
 pm2 restart all
 ```
 
-### 6. Aplicar configuração do Nginx
+### 7. Aplicar configuração do Nginx
 
 ```bash
 # Copiar o arquivo nginx-https.conf para o local correto
@@ -60,7 +78,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 7. Verificar se está funcionando
+### 8. Verificar se está funcionando
 
 ```bash
 # Ver logs do backend
@@ -98,4 +116,3 @@ sudo tail -f /var/log/nginx/error.log
 - Sempre teste a configuração do nginx antes de recarregar (`sudo nginx -t`)
 - Verifique os logs se algo não funcionar (`pm2 logs`)
 - A rota `/produto` precisa estar configurada no nginx para funcionar
-

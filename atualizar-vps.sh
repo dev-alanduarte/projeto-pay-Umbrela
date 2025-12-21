@@ -11,16 +11,25 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# 1. Fazer pull do GitHub
+# 1. Verificar se há mudanças locais
+echo -e "${YELLOW}🔍 Verificando mudanças locais...${NC}"
+if [ -n "$(git status --porcelain)" ]; then
+    echo -e "${YELLOW}⚠️  Há mudanças locais. Fazendo stash...${NC}"
+    git stash push -m "Mudanças locais antes do pull - $(date '+%Y-%m-%d %H:%M:%S')"
+    echo -e "${GREEN}✅ Mudanças locais salvas em stash${NC}"
+fi
+
+# 2. Fazer pull do GitHub
 echo -e "${YELLOW}📥 Fazendo pull do GitHub...${NC}"
 git pull origin main
 if [ $? -ne 0 ]; then
     echo -e "${RED}❌ Erro ao fazer pull${NC}"
+    echo -e "${YELLOW}💡 Se houver conflitos, resolva manualmente ou use: git stash pop${NC}"
     exit 1
 fi
 echo -e "${GREEN}✅ Pull concluído${NC}"
 
-# 2. Instalar dependências do backend
+# 3. Instalar dependências do backend
 echo -e "${YELLOW}📦 Instalando dependências do backend...${NC}"
 cd backend
 npm install --production
@@ -31,7 +40,7 @@ fi
 cd ..
 echo -e "${GREEN}✅ Dependências do backend instaladas${NC}"
 
-# 3. Reiniciar backend com PM2
+# 4. Reiniciar backend com PM2
 echo -e "${YELLOW}🔄 Reiniciando backend...${NC}"
 pm2 restart projeto-pay-umbrela-backend
 if [ $? -ne 0 ]; then
@@ -40,7 +49,7 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}✅ Backend reiniciado${NC}"
 
-# 4. Aplicar configuração do Nginx
+# 5. Aplicar configuração do Nginx
 echo -e "${YELLOW}⚙️  Aplicando configuração do Nginx...${NC}"
 if [ -f "nginx-https.conf" ]; then
     # Copia o arquivo de configuração
@@ -60,7 +69,7 @@ else
     echo -e "${YELLOW}⚠️  Arquivo nginx-https.conf não encontrado. Pulando atualização do Nginx.${NC}"
 fi
 
-# 5. Mostrar status
+# 6. Mostrar status
 echo -e "${YELLOW}📊 Status dos processos:${NC}"
 pm2 status
 
