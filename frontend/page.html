@@ -1106,10 +1106,15 @@
                     if (isDev) {
                         backendUrl = 'http://localhost:3001';
                     } else if (isHttps) {
-                        // Em produção com HTTPS, usa o mesmo domínio (nginx faz proxy)
+                        // Em produção com HTTPS, usa o mesmo domínio SEM PORTA (nginx faz proxy)
                         backendUrl = `${window.location.protocol}//${window.location.hostname}`;
+                        // Garantir que não tem porta
+                        if (backendUrl.includes(':3001')) {
+                            console.warn('⚠️ Backend URL tinha porta 3001, removendo...');
+                            backendUrl = backendUrl.replace(':3001', '');
+                        }
                     } else {
-                        // HTTP em produção
+                        // HTTP em produção (sem SSL)
                         backendUrl = `http://${window.location.hostname}:3001`;
                     }
                     
