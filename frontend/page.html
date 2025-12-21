@@ -1116,6 +1116,9 @@
                     console.log('🔧 Backend URL:', backendUrl);
                     console.log('🔧 Is Dev:', isDev);
                     console.log('🔧 Is HTTPS:', isHttps);
+                    console.log('🔧 Window location:', window.location.href);
+                    console.log('🔧 Path parts:', pathParts);
+                    console.log('🔧 Payment param:', params.get('payment'));
                     
                     // Tenta usar rota simples /cliente/produto/payment/valor se houver cliente e produto no pathname
                     let apiUrl;
@@ -1128,6 +1131,10 @@
                         apiUrl = `${backendUrl}/pix`;
                         useSimpleRoute = false; // Usa POST /pix
                         console.log('🔗 Usando rota POST /pix para /produto?payment=', apiUrl);
+                        console.log('🔗 apiUrl completo:', apiUrl);
+                        console.log('🔗 backendUrl:', backendUrl);
+                        console.log('🔗 apiUrl type:', typeof apiUrl);
+                        console.log('🔗 apiUrl length:', apiUrl ? apiUrl.length : 0);
                     } else if (pathParts.length >= 4 && pathParts[2] === 'payment') {
                         // Tem cliente, produto e payment no path: /cliente/produto/payment/valor
                         const cliente = pathParts[0];
@@ -1179,8 +1186,23 @@
                             hostname: hostname
                         };
                         
-                        console.log('📤 Fazendo POST para /pix:', apiUrl);
+                        console.log('📤 Fazendo POST para /pix');
+                        console.log('📤 apiUrl:', apiUrl);
+                        console.log('📤 apiUrl type:', typeof apiUrl);
+                        console.log('📤 apiUrl é válido?', apiUrl && apiUrl.length > 0);
                         console.log('📤 Payload:', { ...payload, document: '***' });
+                        
+                        // Validação de segurança: garantir que apiUrl não está vazio
+                        if (!apiUrl || apiUrl.trim().length === 0) {
+                            console.error('❌ ERRO: apiUrl está vazio!');
+                            throw new Error('URL da API não configurada corretamente');
+                        }
+                        
+                        // Garantir que apiUrl não seja apenas "/"
+                        if (apiUrl === '/' || apiUrl.trim() === '/') {
+                            console.error('❌ ERRO: apiUrl é apenas "/"!');
+                            throw new Error('URL da API inválida: "/"');
+                        }
                         
                         resp = await fetch(apiUrl, {
                             method: 'POST',
