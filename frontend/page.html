@@ -1097,20 +1097,38 @@
                     }
                     
                     // Configura a URL da API do backend
-                    // Frontend roda na porta 3000, backend na porta 3001
-                    // Sempre usa o backend na porta 3001 (mesmo em produção)
+                    // Em produção, o nginx faz proxy, então usa o mesmo domínio
+                    // Em desenvolvimento, usa localhost:3001
                     const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                    const backendUrl = isDev 
-                        ? 'http://localhost:3001' 
-                        : `${window.location.protocol}//${window.location.hostname}:3001`;
+                    const isHttps = window.location.protocol === 'https:';
+                    
+                    let backendUrl;
+                    if (isDev) {
+                        backendUrl = 'http://localhost:3001';
+                    } else if (isHttps) {
+                        // Em produção com HTTPS, usa o mesmo domínio (nginx faz proxy)
+                        backendUrl = `${window.location.protocol}//${window.location.hostname}`;
+                    } else {
+                        // HTTP em produção
+                        backendUrl = `http://${window.location.hostname}:3001`;
+                    }
                     
                     console.log('🔧 Backend URL:', backendUrl);
+                    console.log('🔧 Is Dev:', isDev);
+                    console.log('🔧 Is HTTPS:', isHttps);
                     
                     // Tenta usar rota simples /cliente/produto/payment/valor se houver cliente e produto no pathname
                     let apiUrl;
                     let useSimpleRoute = false;
                     
-                    if (pathParts.length >= 4 && pathParts[2] === 'payment') {
+                    // Verifica se é a rota /produto?payment=valor
+                    // Para esta rota, vamos fazer POST para /pix com os dados necessários
+                    if (pathParts.length === 1 && pathParts[0] === 'produto' && params.get('payment')) {
+                        // Rota /produto?payment=valor - usa POST /pix
+                        apiUrl = `${backendUrl}/pix`;
+                        useSimpleRoute = false; // Usa POST /pix
+                        console.log('🔗 Usando rota POST /pix para /produto?payment=', apiUrl);
+                    } else if (pathParts.length >= 4 && pathParts[2] === 'payment') {
                         // Tem cliente, produto e payment no path: /cliente/produto/payment/valor
                         const cliente = pathParts[0];
                         const produto = pathParts[1];
@@ -1131,6 +1149,9 @@
                         // Fallback para rota POST /pix (compatibilidade)
                         apiUrl = `${backendUrl}/pix`;
                     }
+                    
+                    console.log('🔗 API URL:', apiUrl);
+                    console.log('📋 Use Simple Route:', useSimpleRoute);
 
                     let resp;
                     if (useSimpleRoute) {
@@ -1143,15 +1164,24 @@
                             }
                         });
                     } else {
-                        // Usa POST na rota /pix (fallback)
-                        const randomCode = `TESTE${Math.floor(Math.random()*1e6)}`;
+                        // Usa POST na rota /pix (fallback ou /produto?payment=valor)
+                        const randomCode = `PRODUTO_${Date.now()}`;
+                        const hostname = (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') 
+                            ? window.location.hostname 
+                            : null;
+                        
                         const payload = {
                             code: randomCode,
                             amount: amountReais,
-                            email: 'cliente2568@gmail.com',
+                            email: 'cliente@produto.com',
                             document: getRandomCpf(),
-                            url: `${backendUrl}/webhook/umbrellapag`
+                            url: `${backendUrl}/webhook/umbrellapag`,
+                            hostname: hostname
                         };
+                        
+                        console.log('📤 Fazendo POST para /pix:', apiUrl);
+                        console.log('📤 Payload:', { ...payload, document: '***' });
+                        
                         resp = await fetch(apiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1159,11 +1189,18 @@
                         });
                     }
 
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    if (!resp.ok) {
+                        const errorText = await resp.text();
+                        console.error('❌ Erro na resposta da API:', resp.status, resp.statusText);
+                        console.error('❌ Detalhes do erro:', errorText);
+                        throw new Error(`HTTP ${resp.status}: ${errorText}`);
+                    }
+                    
                     const data = await resp.json();
+                    console.log('✅ Dados recebidos da API:', data);
 
                     const pixText = data.pixCopiaECola || data.qrCode || '';
-                    console.log('Código PIX recebido:', pixText ? pixText.substring(0, 50) + '...' : 'VAZIO');
+                    console.log('📋 Código PIX recebido:', pixText ? pixText.substring(0, 50) + '...' : 'VAZIO');
                     
                     if (pixText && pixText.trim()) {
                         realPixCode = pixText.trim();
