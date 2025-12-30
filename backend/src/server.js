@@ -270,77 +270,94 @@ app.post('/pix', async (req, res) => {
     const maxRetries = 2;
     let lastError = null;
     
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        if (attempt > 0) {
-          console.log(`🔄 Tentativa ${attempt + 1}/${maxRetries + 1}...`);
-          // Aguarda um pouco antes de tentar novamente
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
-        
-        umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': UMBRELLA_TOKEN,
-            'User-Agent': 'UMBRELLAB2B/1.0'
-          },
-          timeout: 60000 // 60 segundos (aumentado de 30)
-        });
-        
-        // Se chegou aqui, deu certo
-        break;
-      } catch (error) {
-        lastError = error;
-        
-        // Se não for timeout, não tenta novamente
-        if (error.code !== 'ECONNABORTED' && !error.message.includes('timeout') && error.code !== 'ETIMEDOUT') {
-          // Se for erro de resposta HTTP, trata e retorna
-          if (error.response) {
-            console.log(`📥 Status da API: ${error.response.status} ${error.response.statusText}`);
-            console.log('📥 Resposta da API (erro):', JSON.stringify(error.response.data));
-            const umbrellaData = error.response.data;
-            const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
-            const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
-            
-            return res.status(400).json({
+    try {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          if (attempt > 0) {
+            console.log(`🔄 Tentativa ${attempt + 1}/${maxRetries + 1}...`);
+            // Aguarda um pouco antes de tentar novamente
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
+          
+          umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': UMBRELLA_TOKEN,
+              'User-Agent': 'UMBRELLAB2B/1.0'
+            },
+            timeout: 60000 // 60 segundos (aumentado de 30)
+          });
+          
+          // Se chegou aqui, deu certo
+          break;
+        } catch (error) {
+          lastError = error;
+          
+          // Se não for timeout, não tenta novamente
+          if (error.code !== 'ECONNABORTED' && !error.message.includes('timeout') && error.code !== 'ETIMEDOUT') {
+            // Se for erro de resposta HTTP, trata e retorna
+            if (error.response) {
+              console.log(`📥 Status da API: ${error.response.status} ${error.response.statusText}`);
+              console.log('📥 Resposta da API (erro):', JSON.stringify(error.response.data));
+              const umbrellaData = error.response.data;
+              const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
+              const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
+              
+              return res.status(400).json({
+                success: false,
+                error: refusedReason || errorMsg,
+                details: {
+                  status: (umbrellaData && umbrellaData.status),
+                  message: (umbrellaData && umbrellaData.message),
+                  refusedReason: refusedReason,
+                  provider: (umbrellaData && umbrellaData.error && umbrellaData.error.provider)
+                }
+              });
+            }
+            // Outros erros não relacionados a timeout - retorna erro
+            return res.status(500).json({
               success: false,
-              error: refusedReason || errorMsg,
+              error: 'Erro ao conectar com a API UmbrellaPag.',
               details: {
-                status: (umbrellaData && umbrellaData.status),
-                message: (umbrellaData && umbrellaData.message),
-                refusedReason: refusedReason,
-                provider: (umbrellaData && umbrellaData.error && umbrellaData.error.provider)
+                code: error.code,
+                message: error.message
               }
             });
           }
-          // Outros erros não relacionados a timeout
-          throw error;
-        }
-        
-        // Se for timeout e ainda tem tentativas, continua o loop
-        if (attempt < maxRetries) {
-          console.log(`⏱️ Timeout na tentativa ${attempt + 1}, tentando novamente...`);
-          continue;
-        }
-        
-        // Se esgotou as tentativas, retorna erro
-        return res.status(504).json({
-          success: false,
-          error: 'Timeout ao conectar com a API UmbrellaPag após várias tentativas. Tente novamente em alguns instantes.',
-          details: {
-            attempts: maxRetries + 1,
-            lastError: error.message || error.code
+          
+          // Se for timeout e ainda tem tentativas, continua o loop
+          if (attempt < maxRetries) {
+            console.log(`⏱️ Timeout na tentativa ${attempt + 1}, tentando novamente...`);
+            continue;
           }
+          
+          // Se esgotou as tentativas, retorna erro
+          return res.status(504).json({
+            success: false,
+            error: 'Timeout ao conectar com a API UmbrellaPag após várias tentativas. Tente novamente em alguns instantes.',
+            details: {
+              attempts: maxRetries + 1,
+              lastError: error.message || error.code
+            }
+          });
+        }
+      }
+      
+      // Se chegou aqui mas não tem resposta, algo deu errado
+      if (!umbrellaRes) {
+        return res.status(500).json({
+          success: false,
+          error: 'Erro inesperado ao conectar com a API UmbrellaPag.',
+          details: lastError ? lastError.message : 'Unknown error'
         });
       }
-    }
-    
-    // Se chegou aqui mas não tem resposta, algo deu errado
-    if (!umbrellaRes) {
+    } catch (error) {
+      // Catch final para qualquer erro não tratado
+      console.error('❌ Erro inesperado na requisição:', error);
       return res.status(500).json({
         success: false,
-        error: 'Erro inesperado ao conectar com a API UmbrellaPag.',
-        details: lastError ? lastError.message : 'Unknown error'
+        error: 'Erro inesperado ao processar requisição.',
+        details: error.message
       });
     }
     
