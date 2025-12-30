@@ -83,7 +83,7 @@ async function testDirect() {
         'x-api-key': UMBRELLA_TOKEN,
         'User-Agent': 'UMBRELLAB2B/1.0'
       },
-      timeout: 30000, // 30 segundos
+      timeout: 15000, // 15 segundos (igual ao test-vps-network que funciona)
       httpsAgent: new https.Agent({ keepAlive: true }),
       validateStatus: function() { return true; } // Aceita qualquer status
     });
