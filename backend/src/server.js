@@ -295,22 +295,40 @@ app.post('/pix', async (req, res) => {
       console.log('📡 Enviando requisição...');
       console.log('   URL:', UMBRELLA_API_URL);
       console.log('   API Key:', UMBRELLA_TOKEN ? `${UMBRELLA_TOKEN.substring(0, 8)}...` : 'NÃO DEFINIDA');
+      console.log('   Timeout: 30000ms (30 segundos)');
       const startTime = Date.now();
       
-      umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': UMBRELLA_TOKEN,
-          'User-Agent': 'UMBRELLAB2B/1.0'
-        },
-        timeout: 15000, // 15 segundos
-        httpsAgent: new https.Agent({ keepAlive: true }),
-        validateStatus: function (status) {
-          return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
-        }
-      });
-      const elapsed = Date.now() - startTime;
-      console.log(`⏱️ Requisição completou em ${elapsed}ms`);
+      // Log de progresso a cada 5 segundos
+      const progressInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        console.log(`   ⏳ Ainda aguardando resposta... (${elapsed}ms)`);
+      }, 5000);
+      
+      try {
+        umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': UMBRELLA_TOKEN,
+            'User-Agent': 'UMBRELLAB2B/1.0'
+          },
+          timeout: 30000, // 30 segundos (aumentado)
+          httpsAgent: new https.Agent({ 
+            keepAlive: true,
+            // Configurações adicionais para melhorar conectividade
+            maxSockets: 50,
+            maxFreeSockets: 10
+          }),
+          validateStatus: function (status) {
+            return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
+          }
+        });
+        clearInterval(progressInterval);
+        const elapsed = Date.now() - startTime;
+        console.log(`⏱️ Requisição completou em ${elapsed}ms`);
+      } catch (err) {
+        clearInterval(progressInterval);
+        throw err;
+      }
     } catch (error) {
       // Se for erro de resposta HTTP, trata e retorna
       if (error.response) {
