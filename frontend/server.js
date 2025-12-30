@@ -52,15 +52,27 @@ const server = http.createServer((req, res) => {
         if (filePath !== './page.html') {
           fs.readFile('./page.html', (err, html) => {
             if (err) {
-              res.writeHead(404, { 'Content-Type': 'text/html' });
+              res.writeHead(404, { 
+                'Content-Type': 'text/html',
+                'X-Content-Type-Options': 'nosniff'
+              });
               res.end('<h1>404 - File Not Found</h1>', 'utf-8');
             } else {
-              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.writeHead(200, { 
+                'Content-Type': 'text/html',
+                'X-Content-Type-Options': 'nosniff',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+              });
               res.end(html, 'utf-8');
             }
           });
         } else {
-          res.writeHead(404, { 'Content-Type': 'text/html' });
+          res.writeHead(404, { 
+            'Content-Type': 'text/html',
+            'X-Content-Type-Options': 'nosniff'
+          });
           res.end('<h1>404 - File Not Found</h1>', 'utf-8');
         }
       } else {
@@ -68,7 +80,19 @@ const server = http.createServer((req, res) => {
         res.end(`Server Error: ${error.code}`, 'utf-8');
       }
     } else {
-      res.writeHead(200, { 'Content-Type': contentType });
+      const headers = {
+        'Content-Type': contentType,
+        'X-Content-Type-Options': 'nosniff'
+      };
+      
+      // Para arquivos HTML, adiciona headers para evitar cache e redirecionamentos
+      if (contentType === 'text/html') {
+        headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+        headers['Pragma'] = 'no-cache';
+        headers['Expires'] = '0';
+      }
+      
+      res.writeHead(200, headers);
       res.end(content, 'utf-8');
     }
   });
