@@ -291,24 +291,24 @@ app.post('/pix', async (req, res) => {
     }
 
     if (!umbrellaRes.ok) {
-      const errorMsg = umbrellaData?.message || umbrellaData?.error || JSON.stringify(umbrellaData);
-      const refusedReason = umbrellaData?.error?.refusedReason || umbrellaData?.refusedReason || '';
+      const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
+      const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
       
       return res.status(400).json({
         success: false,
         error: refusedReason || errorMsg,
         details: {
-          status: umbrellaData?.status,
-          message: umbrellaData?.message,
+          status: (umbrellaData && umbrellaData.status),
+          message: (umbrellaData && umbrellaData.message),
           refusedReason: refusedReason,
-          provider: umbrellaData?.error?.provider
+          provider: (umbrellaData && umbrellaData.error && umbrellaData.error.provider)
         }
       });
     }
 
     // Extrai QR Code
-    const transactionId = umbrellaData.data?.id || umbrellaData.id;
-    const pixData = umbrellaData.data?.pix || umbrellaData.pix || {};
+    const transactionId = (umbrellaData.data && umbrellaData.data.id) || umbrellaData.id;
+    const pixData = (umbrellaData.data && umbrellaData.data.pix) || (umbrellaData.pix) || {};
     const paymentData = umbrellaData.data || umbrellaData;
     
     const pixCode = paymentData.qrCode || 
@@ -316,8 +316,8 @@ app.post('/pix', async (req, res) => {
                     pixData.qrCode || 
                     pixData.copiaECola || 
                     pixData.pixCopyPaste ||
-                    paymentData.pix?.qrcode ||
-                    paymentData.pix?.qrCode;
+                    (paymentData.pix && paymentData.pix.qrcode) ||
+                    (paymentData.pix && paymentData.pix.qrCode);
 
     console.log('✅ QR Code extraído:', pixCode ? `${pixCode.substring(0, 50)}...` : 'NÃO ENCONTRADO');
 
