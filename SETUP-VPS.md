@@ -1,6 +1,23 @@
 # 🚀 Setup Inicial na VPS
 
-## Passo 1: Instalar Dependências
+## ⚠️ IMPORTANTE: Node.js v12 é muito antigo
+
+Se você tiver Node.js v12, precisa atualizar ou usar versões compatíveis.
+
+## Passo 1: Limpar PM2 Antigo
+
+```bash
+# Parar todos os processos
+pm2 stop all
+
+# Deletar todos os processos
+pm2 delete all
+
+# Limpar dump
+pm2 kill
+```
+
+## Passo 2: Instalar Dependências
 
 ```bash
 # Backend
@@ -14,7 +31,7 @@ npm install --production
 cd ..
 ```
 
-## Passo 2: Configurar Variáveis de Ambiente
+## Passo 3: Configurar Variáveis de Ambiente
 
 ```bash
 # Criar arquivo .env no backend
@@ -32,18 +49,18 @@ NODE_ENV=production
 
 Salve e saia (Ctrl+X, Y, Enter)
 
-## Passo 3: Criar Diretório de Logs
+## Passo 4: Criar Diretório de Logs
 
 ```bash
 cd ~/projeto-pay-Umbrela
 mkdir -p logs
 ```
 
-## Passo 4: Iniciar com PM2
+## Passo 5: Iniciar com PM2 (NOVO)
 
 ```bash
-# Instalar PM2 globalmente (se não tiver)
-npm install -g pm2
+# Limpar PM2 primeiro
+pm2 kill
 
 # Iniciar aplicação
 pm2 start ecosystem.config.js
@@ -58,7 +75,7 @@ pm2 status
 pm2 logs
 ```
 
-## Passo 5: Testar
+## Passo 6: Testar
 
 ```bash
 # Testar backend
@@ -67,19 +84,27 @@ curl -X POST http://localhost:3001/pix \
   -d '{"amount": 10.00}'
 ```
 
-## Passo 6: Configurar Nginx (se necessário)
+## 🔧 Se Node.js v12 der problema:
+
+### Opção 1: Atualizar Node.js (Recomendado)
 
 ```bash
-# Copiar configuração
-sudo cp nginx-https.conf /etc/nginx/sites-available/pagamento
-sudo ln -s /etc/nginx/sites-available/pagamento /etc/nginx/sites-enabled/
+# Instalar NVM
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
 
-# Testar configuração
-sudo nginx -t
+# Instalar Node.js 18 LTS
+nvm install 18
+nvm use 18
+nvm alias default 18
 
-# Reiniciar Nginx
-sudo systemctl restart nginx
+# Verificar versão
+node --version
 ```
+
+### Opção 2: Usar versões antigas compatíveis
+
+Se não puder atualizar Node.js, precisamos ajustar as dependências.
 
 ## Comandos Úteis
 
@@ -97,4 +122,3 @@ pm2 stop all
 # Ver status
 pm2 status
 ```
-
