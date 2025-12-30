@@ -265,27 +265,32 @@ app.post('/pix', async (req, res) => {
 
     console.log('📤 Payload para UmbrellaPag:', JSON.stringify(transactionPayload, null, 2));
 
-    // Chama API UmbrellaPag com timeout de 30 segundos
+    // Chama API UmbrellaPag com timeout de 30 segundos (compatível com Node.js antigo)
     const timeout = 30000; // 30 segundos
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    // Função helper para timeout sem AbortController (compatível com Node.js antigo)
+    const fetchWithTimeout = (url, options, timeoutMs) => {
+      return Promise.race([
+        fetch(url, options),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout ao conectar com a API UmbrellaPag')), timeoutMs);
+        })
+      ]);
+    };
 
     let umbrellaRes;
     try {
-      umbrellaRes = await fetch(UMBRELLA_API_URL, {
+      umbrellaRes = await fetchWithTimeout(UMBRELLA_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': UMBRELLA_TOKEN,
           'User-Agent': 'UMBRELLAB2B/1.0'
         },
-        body: JSON.stringify(transactionPayload),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+        body: JSON.stringify(transactionPayload)
+      }, timeout);
     } catch (error) {
-      clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error.message === 'Timeout ao conectar com a API UmbrellaPag') {
         return res.status(504).json({
           success: false,
           error: 'Timeout ao conectar com a API UmbrellaPag. Tente novamente.'
