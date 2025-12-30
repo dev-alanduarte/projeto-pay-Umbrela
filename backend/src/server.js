@@ -299,7 +299,7 @@ app.post('/pix', async (req, res) => {
             },
             timeout: 15000, // 15 segundos (igual ao script de teste que funciona)
             // Configuração que funciona (igual ao script de teste)
-            httpsAgent: new https.Agent({ keepAlive: true, maxSockets: 5 }),
+            httpsAgent: new https.Agent({ keepAlive: true }),
             validateStatus: function (status) {
               return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
             }
