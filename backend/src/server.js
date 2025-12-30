@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fetch from 'node-fetch';
+import axios from 'axios';
 // import { createPixTransaction } from './umbrellapagClient.js'; // REMOVIDO - usando edge function agora
 
 // Para usar __dirname em ES modules
@@ -265,54 +265,51 @@ app.post('/pix', async (req, res) => {
 
     console.log('📤 Payload para UmbrellaPag:', JSON.stringify(transactionPayload, null, 2));
 
-    // Chama API UmbrellaPag com timeout de 30 segundos (compatível com Node.js antigo)
-    const timeout = 30000; // 30 segundos
-    
-    // Função helper para timeout sem AbortController (compatível com Node.js antigo)
-    const fetchWithTimeout = (url, options, timeoutMs) => {
-      return Promise.race([
-        fetch(url, options),
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout ao conectar com a API UmbrellaPag')), timeoutMs);
-        })
-      ]);
-    };
-
+    // Chama API UmbrellaPag usando axios (mais confiável que node-fetch)
     let umbrellaRes;
     try {
-      umbrellaRes = await fetchWithTimeout(UMBRELLA_API_URL, {
-        method: 'POST',
+      umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': UMBRELLA_TOKEN,
           'User-Agent': 'UMBRELLAB2B/1.0'
         },
-        body: JSON.stringify(transactionPayload)
-      }, timeout);
+        timeout: 30000 // 30 segundos
+      });
     } catch (error) {
-      if (error.message === 'Timeout ao conectar com a API UmbrellaPag') {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
         return res.status(504).json({
           success: false,
           error: 'Timeout ao conectar com a API UmbrellaPag. Tente novamente.'
         });
       }
+      if (error.response) {
+        // API respondeu com erro
+        console.log(`📥 Status da API: ${error.response.status} ${error.response.statusText}`);
+        console.log('📥 Resposta da API (erro):', JSON.stringify(error.response.data));
+        const umbrellaData = error.response.data;
+        const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
+        const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
+        
+        return res.status(400).json({
+          success: false,
+          error: refusedReason || errorMsg,
+          details: {
+            status: (umbrellaData && umbrellaData.status),
+            message: (umbrellaData && umbrellaData.message),
+            refusedReason: refusedReason,
+            provider: (umbrellaData && umbrellaData.error && umbrellaData.error.provider)
+          }
+        });
+      }
+      // Erro de rede/conexão
       throw error;
     }
 
     console.log(`📥 Status da API: ${umbrellaRes.status} ${umbrellaRes.statusText}`);
+    console.log('📥 Resposta da API:', JSON.stringify(umbrellaRes.data));
 
-    const responseText = await umbrellaRes.text();
-    console.log('📥 Resposta da API:', responseText);
-
-    let umbrellaData;
-    try {
-      umbrellaData = JSON.parse(responseText);
-    } catch (e) {
-      return res.status(500).json({
-        success: false,
-        error: `Umbrella API Error (Non-JSON): ${umbrellaRes.status} ${umbrellaRes.statusText}`
-      });
-    }
+    const umbrellaData = umbrellaRes.data;
 
     if (!umbrellaRes.ok) {
       const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
