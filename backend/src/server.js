@@ -7,6 +7,8 @@ import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import axios from 'axios';
+import http from 'http';
+import https from 'https';
 // import { createPixTransaction } from './umbrellapagClient.js'; // REMOVIDO - usando edge function agora
 
 // Para usar __dirname em ES modules
