@@ -265,24 +265,64 @@ app.post('/pix', async (req, res) => {
 
     console.log('📤 Payload para UmbrellaPag:', JSON.stringify(transactionPayload, null, 2));
 
-    // Chama API UmbrellaPag usando axios (mais confiável que node-fetch)
+    // Chama API UmbrellaPag usando axios com retry em caso de timeout
     let umbrellaRes;
-    try {
-      umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': UMBRELLA_TOKEN,
-          'User-Agent': 'UMBRELLAB2B/1.0'
-        },
-        timeout: 30000 // 30 segundos
-      });
-    } catch (error) {
-      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+    const maxRetries = 2;
+    let lastError = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`🔄 Tentativa ${attempt + 1}/${maxRetries + 1}...`);
+          // Aguarda um pouco antes de tentar novamente
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+        
+        umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': UMBRELLA_TOKEN,
+            'User-Agent': 'UMBRELLAB2B/1.0'
+          },
+          timeout: 60000 // 60 segundos (aumentado de 30)
+        });
+        
+        // Se chegou aqui, deu certo
+        break;
+      } catch (error) {
+        lastError = error;
+        
+        // Se não for timeout, não tenta novamente
+        if (error.code !== 'ECONNABORTED' && !error.message.includes('timeout') && !error.code === 'ETIMEDOUT') {
+          throw error;
+        }
+        
+        // Se for timeout e ainda tem tentativas, continua o loop
+        if (attempt < maxRetries) {
+          console.log(`⏱️ Timeout na tentativa ${attempt + 1}, tentando novamente...`);
+          continue;
+        }
+        
+        // Se esgotou as tentativas, retorna erro
         return res.status(504).json({
           success: false,
-          error: 'Timeout ao conectar com a API UmbrellaPag. Tente novamente.'
+          error: 'Timeout ao conectar com a API UmbrellaPag após várias tentativas. Tente novamente em alguns instantes.',
+          details: {
+            attempts: maxRetries + 1,
+            lastError: error.message || error.code
+          }
         });
       }
+    }
+    
+    // Se chegou aqui mas não tem resposta, algo deu errado
+    if (!umbrellaRes) {
+      return res.status(500).json({
+        success: false,
+        error: 'Erro inesperado ao conectar com a API UmbrellaPag.',
+        details: lastError ? lastError.message : 'Unknown error'
+      });
+    }
       if (error.response) {
         // API respondeu com erro
         console.log(`📥 Status da API: ${error.response.status} ${error.response.statusText}`);
