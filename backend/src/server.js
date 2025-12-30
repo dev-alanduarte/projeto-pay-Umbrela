@@ -323,27 +323,23 @@ app.post('/pix', async (req, res) => {
         details: lastError ? lastError.message : 'Unknown error'
       });
     }
-      if (error.response) {
-        // API respondeu com erro
-        console.log(`📥 Status da API: ${error.response.status} ${error.response.statusText}`);
-        console.log('📥 Resposta da API (erro):', JSON.stringify(error.response.data));
-        const umbrellaData = error.response.data;
-        const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
-        const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
-        
-        return res.status(400).json({
-          success: false,
-          error: refusedReason || errorMsg,
-          details: {
-            status: (umbrellaData && umbrellaData.status),
-            message: (umbrellaData && umbrellaData.message),
-            refusedReason: refusedReason,
-            provider: (umbrellaData && umbrellaData.error && umbrellaData.error.provider)
-          }
-        });
-      }
-      // Erro de rede/conexão
-      throw error;
+    
+    // Tratar erros de resposta HTTP (4xx, 5xx)
+    if (umbrellaRes.status >= 400) {
+      const umbrellaData = umbrellaRes.data;
+      const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
+      const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
+      
+      return res.status(400).json({
+        success: false,
+        error: refusedReason || errorMsg,
+        details: {
+          status: (umbrellaData && umbrellaData.status),
+          message: (umbrellaData && umbrellaData.message),
+          refusedReason: refusedReason,
+          provider: (umbrellaData && umbrellaData.error && umbrellaData.error.provider)
+        }
+      });
     }
 
     console.log(`📥 Status da API: ${umbrellaRes.status} ${umbrellaRes.statusText}`);
