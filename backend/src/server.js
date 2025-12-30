@@ -293,7 +293,27 @@ app.post('/pix', async (req, res) => {
         lastError = error;
         
         // Se não for timeout, não tenta novamente
-        if (error.code !== 'ECONNABORTED' && !error.message.includes('timeout') && !error.code === 'ETIMEDOUT') {
+        if (error.code !== 'ECONNABORTED' && !error.message.includes('timeout') && error.code !== 'ETIMEDOUT') {
+          // Se for erro de resposta HTTP, trata e retorna
+          if (error.response) {
+            console.log(`📥 Status da API: ${error.response.status} ${error.response.statusText}`);
+            console.log('📥 Resposta da API (erro):', JSON.stringify(error.response.data));
+            const umbrellaData = error.response.data;
+            const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
+            const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
+            
+            return res.status(400).json({
+              success: false,
+              error: refusedReason || errorMsg,
+              details: {
+                status: (umbrellaData && umbrellaData.status),
+                message: (umbrellaData && umbrellaData.message),
+                refusedReason: refusedReason,
+                provider: (umbrellaData && umbrellaData.error && umbrellaData.error.provider)
+              }
+            });
+          }
+          // Outros erros não relacionados a timeout
           throw error;
         }
         
