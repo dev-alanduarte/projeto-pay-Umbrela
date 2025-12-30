@@ -311,7 +311,8 @@ app.post('/pix', async (req, res) => {
 
     const umbrellaData = umbrellaRes.data;
 
-    if (!umbrellaRes.ok) {
+    // Verificar se a resposta indica erro (mesmo com status 200, pode ter erro no body)
+    if (umbrellaRes.status >= 400 || (umbrellaData && umbrellaData.status && umbrellaData.status >= 400)) {
       const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
       const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
       
