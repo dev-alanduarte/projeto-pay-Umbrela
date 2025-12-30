@@ -1,9 +1,11 @@
+const path = require('path');
+
 module.exports = {
   apps: [
     {
       name: 'projeto-pay-umbrela-backend',
-      script: 'src/server.js',
-      cwd: './backend',
+      script: path.resolve(__dirname, 'backend', 'src', 'server.js'),
+      cwd: path.resolve(__dirname, 'backend'),
       interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
