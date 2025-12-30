@@ -1106,55 +1106,21 @@
                     
                     console.log('🔧 Backend URL:', backendUrl);
                     
-                    // Tenta usar rota simples /cliente/produto/payment/valor se houver cliente e produto no pathname
-                    let apiUrl;
-                    let useSimpleRoute = false;
+                    // Sempre usa POST na rota /pix (simplificado)
+                    const apiUrl = `${backendUrl}/pix`;
+                    const payload = {
+                        amount: amountReais
+                        // name, email, document, phone serão gerados automaticamente no backend
+                    };
                     
-                    if (pathParts.length >= 4 && pathParts[2] === 'payment') {
-                        // Tem cliente, produto e payment no path: /cliente/produto/payment/valor
-                        const cliente = pathParts[0];
-                        const produto = pathParts[1];
-                        const valorFromPath = pathParts[3];
-                        // Usa o valor do path se disponível, senão usa o calculado
-                        const valorFinal = valorFromPath ? parseFloat(valorFromPath) : amountReais;
-                        // Usa formato: /cliente/produto/payment/valor (com header Accept para API)
-                        apiUrl = `${backendUrl}/${cliente}/${produto}/payment/${valorFinal}`;
-                        useSimpleRoute = true;
-                    } else if (pathParts.length >= 2) {
-                        // Tem cliente e produto no path: /cliente/produto
-                        const cliente = pathParts[0];
-                        const produto = pathParts[1];
-                        // Usa formato: /cliente/produto/payment/valor (com header Accept para API)
-                        apiUrl = `${backendUrl}/${cliente}/${produto}/payment/${amountReais}`;
-                        useSimpleRoute = true;
-                    } else {
-                        // Fallback para rota POST /pix (compatibilidade)
-                        apiUrl = `${backendUrl}/pix`;
-                    }
-
-                    let resp;
-                    if (useSimpleRoute) {
-                        // Usa GET na rota simples com Accept: application/json para indicar que é API
-                        resp = await fetch(apiUrl, {
-                            method: 'GET',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json'
-                            }
-                        });
-                    } else {
-                        // Usa POST na rota /pix
-                        apiUrl = `${backendUrl}/pix`;
-                        const payload = {
-                            amount: amountReais
-                            // name, email, document, phone serão gerados automaticamente no backend
-                        };
-                        resp = await fetch(apiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                    }
+                    console.log('📤 Enviando requisição para:', apiUrl);
+                    console.log('📤 Payload:', payload);
+                    
+                    const resp = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
 
                     if (!resp.ok) {
                         const errorData = await resp.json().catch(() => ({}));
