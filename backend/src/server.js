@@ -293,7 +293,10 @@ app.post('/pix', async (req, res) => {
     
     try {
       console.log('📡 Enviando requisição...');
+      console.log('   URL:', UMBRELLA_API_URL);
+      console.log('   API Key:', UMBRELLA_TOKEN ? `${UMBRELLA_TOKEN.substring(0, 8)}...` : 'NÃO DEFINIDA');
       const startTime = Date.now();
+      
       umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
         headers: {
           'Content-Type': 'application/json',
@@ -301,7 +304,11 @@ app.post('/pix', async (req, res) => {
           'User-Agent': 'UMBRELLAB2B/1.0'
         },
         timeout: 15000, // 15 segundos
-        httpsAgent: new https.Agent({ keepAlive: true }),
+        httpsAgent: new https.Agent({ 
+          keepAlive: true,
+          // Forçar IPv4 se necessário
+          family: 4
+        }),
         validateStatus: function (status) {
           return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
         }
