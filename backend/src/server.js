@@ -297,9 +297,9 @@ app.post('/pix', async (req, res) => {
               'x-api-key': UMBRELLA_TOKEN,
               'User-Agent': 'UMBRELLAB2B/1.0'
             },
-            timeout: 30000, // 30 segundos
+            timeout: 15000, // 15 segundos (igual ao script de teste que funciona)
             // Configuração que funciona (igual ao script de teste)
-            httpsAgent: new https.Agent({ keepAlive: true }),
+            httpsAgent: new https.Agent({ keepAlive: true, maxSockets: 5 }),
             validateStatus: function (status) {
               return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
             }
