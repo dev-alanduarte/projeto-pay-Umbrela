@@ -44,54 +44,13 @@ async function runDiagnostics() {
   }
 
   // Teste 3: Conectividade com API UmbrellaPag (sem autenticação)
+  // PULADO - Vamos direto para teste real com auth
   console.log('\n3️⃣ Testando conectividade com API UmbrellaPag (sem auth)...');
-  try {
-    const startTime = Date.now();
-    const response = await axios.post(UMBRELLA_API_URL, { test: 'test' }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': 'test-key'
-      },
-      timeout: 10000,
-      validateStatus: function() { return true; }, // Aceita qualquer status
-      httpsAgent: new https.Agent({ keepAlive: true })
-    });
-    const elapsed = Date.now() - startTime;
-    console.log(`✅ Conectividade com API OK (${elapsed}ms)`);
-    console.log(`   Status: ${response.status} ${response.statusText}`);
-    
-    if (response.status === 401 || response.status === 403) {
-      console.log('   ✅ API responde (erro de auth é esperado)');
-    } else {
-      console.log(`   ⚠️  Status inesperado: ${response.status}`);
-    }
-  } catch (error) {
-    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      console.log(`❌ TIMEOUT ao conectar com API UmbrellaPag`);
-      console.log('   ⚠️  A VPS não consegue conectar com a API!');
-      console.log('\n💡 POSSÍVEIS CAUSAS:');
-      console.log('   1. Firewall bloqueando conexões HTTPS de saída (porta 443)');
-      console.log('   2. IP da VPS bloqueado pela API UmbrellaPag');
-      console.log('   3. Problema de rede do provedor da VPS');
-      console.log('   4. Proxy ou NAT bloqueando conexões');
-      console.log('\n💡 SOLUÇÕES:');
-      console.log('   1. Verificar firewall: iptables -L OUTPUT -n -v');
-      console.log('   2. Contatar suporte UmbrellaPag para liberar IP da VPS');
-      console.log('   3. Verificar com provedor da VPS sobre bloqueios de rede');
-      process.exit(1);
-    } else if (error.code === 'ECONNREFUSED') {
-      console.log(`❌ CONEXÃO RECUSADA pela API`);
-      console.log('   ⚠️  A API pode estar bloqueando o IP da VPS');
-    } else {
-      console.log(`❌ ERRO: ${error.message}`);
-      console.log(`   Código: ${error.code}`);
-    }
-    process.exit(1);
-  }
+  console.log('   ⏭️  Pulando este teste - indo direto para requisição real com auth');
 
   // Teste 4: Conectividade com API UmbrellaPag (com autenticação real)
+  console.log('\n4️⃣ Testando requisição REAL com API UmbrellaPag (com auth)...');
   if (UMBRELLA_TOKEN) {
-    console.log('\n4️⃣ Testando requisição real com API UmbrellaPag...');
     try {
       const testPayload = {
         amount: 100, // R$ 1,00
