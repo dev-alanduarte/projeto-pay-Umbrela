@@ -11,7 +11,8 @@
     "test:connectivity": "node test-connectivity.js",
     "test:vps-network": "node test-vps-network.js",
     "test:api-get": "node test-api-get.js",
-    "test:env": "node test-env-loading.js"
+    "test:env": "node test-env-loading.js",
+    "test:umbrellapag": "node test-umbrellapag-direct.js"
   },
   "dependencies": {
     "axios": "^1.7.7",
