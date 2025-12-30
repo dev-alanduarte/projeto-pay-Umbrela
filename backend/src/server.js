@@ -1034,9 +1034,10 @@ app.get('*', (req, res, next) => {
 const port = Number(process.env.PORT || 3001);
 const frontendPort = Number(process.env.FRONTEND_PORT || 3000);
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
-  console.log(`Backend running on http://localhost:${port}`);
+  console.log(`Backend running on http://0.0.0.0:${port}`);
+  console.log(`✅ Acessível via: http://localhost:${port} ou http://24.152.36.55:${port}`);
 });
 
 // Em desenvolvimento, também escuta na porta 3000 para servir o frontend com roteamento
