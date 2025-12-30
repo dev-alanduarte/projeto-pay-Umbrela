@@ -36,9 +36,10 @@ module.exports = {
     },
     {
       name: 'projeto-pay-umbrela-frontend',
-      script: 'server.js',
+      script: 'npm',
+      args: 'start',
       cwd: './frontend',
-      interpreter: 'node',
+      interpreter: 'none',
       instances: 1,
       exec_mode: 'fork',
       env: {
