@@ -74,8 +74,9 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Frontend server running on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Frontend server running on http://0.0.0.0:${PORT}`);
+  console.log(`✅ Acessível via: http://localhost:${PORT} ou http://24.152.36.55:${PORT}`);
   console.log(`Access: http://localhost:${PORT}/produto?payment=10.00`);
 });
 
