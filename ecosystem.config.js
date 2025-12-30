@@ -2,10 +2,9 @@ module.exports = {
   apps: [
     {
       name: 'projeto-pay-umbrela-backend',
-      script: 'npm',
-      args: 'start',
+      script: 'src/server.js',
       cwd: './backend',
-      interpreter: 'none',
+      interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
       env: {
@@ -23,6 +22,9 @@ module.exports = {
       watch: false,
       max_memory_restart: '500M',
       
+      // IMPORTANTE: O dotenv/config no server.js vai carregar o .env
+      // O cwd: './backend' garante que o .env será encontrado no diretório correto
+      
       // Variáveis de ambiente (podem ser sobrescritas pelo .env)
       env_production: {
         NODE_ENV: 'production',
@@ -31,10 +33,9 @@ module.exports = {
     },
     {
       name: 'projeto-pay-umbrela-frontend',
-      script: 'npm',
-      args: 'start',
+      script: 'server.js',
       cwd: './frontend',
-      interpreter: 'none',
+      interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
       env: {
