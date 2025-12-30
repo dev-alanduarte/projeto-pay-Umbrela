@@ -281,14 +281,20 @@ app.post('/pix', async (req, res) => {
           }
           
           console.log(`📡 Tentativa ${attempt + 1}: Enviando requisição...`);
+          const startTime = Date.now();
           umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
             headers: {
               'Content-Type': 'application/json',
               'x-api-key': UMBRELLA_TOKEN,
               'User-Agent': 'UMBRELLAB2B/1.0'
             },
-            timeout: 60000 // 60 segundos (aumentado de 30)
+            timeout: 30000, // 30 segundos (reduzido para detectar problemas mais rápido)
+            validateStatus: function (status) {
+              return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
+            }
           });
+          const elapsed = Date.now() - startTime;
+          console.log(`⏱️ Requisição completou em ${elapsed}ms`);
           
           // Se chegou aqui, deu certo
           break;
