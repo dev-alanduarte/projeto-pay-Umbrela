@@ -37,8 +37,7 @@ async function testGet() {
     console.log('✅ Teste completo!');
     
   } catch (error) {
-    const elapsed = Date.now() - startTime;
-    console.log(`❌ Erro após ${elapsed}ms`);
+    console.log(`❌ Erro ao conectar`);
     
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
       console.log('❌ TIMEOUT - Não conseguiu conectar');
