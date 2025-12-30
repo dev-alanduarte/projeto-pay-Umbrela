@@ -163,10 +163,23 @@ app.post('/pix', async (req, res) => {
     const UMBRELLA_API_URL = "https://api-gateway.umbrellapag.com/api/user/transactions";
     const UMBRELLA_TOKEN = process.env.UMBRELLAPAG_API_KEY;
     
+    // Diagnóstico: verificar se .env está carregado
+    console.log('🔍 Diagnóstico de variáveis de ambiente:');
+    console.log('   UMBRELLAPAG_API_KEY:', UMBRELLA_TOKEN ? `${UMBRELLA_TOKEN.substring(0, 8)}...` : 'NÃO DEFINIDA');
+    console.log('   PORT:', process.env.PORT || 'não definido');
+    console.log('   NODE_ENV:', process.env.NODE_ENV || 'não definido');
+    console.log('   CWD:', process.cwd());
+    
     if (!UMBRELLA_TOKEN) {
+      console.error('❌ ERRO: UMBRELLAPAG_API_KEY não está definida!');
+      console.error('   Verifique se o arquivo .env existe em:', process.cwd());
       return res.status(400).json({
         success: false,
-        error: "Missing UMBRELLAPAG_API_KEY in environment variables."
+        error: "Missing UMBRELLAPAG_API_KEY in environment variables.",
+        details: {
+          cwd: process.cwd(),
+          envFile: process.cwd() + '/.env'
+        }
       });
     }
 
