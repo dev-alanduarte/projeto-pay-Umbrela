@@ -45,7 +45,9 @@ app.use(cors({
     'http://localhost:3001', 
     'http://127.0.0.1:3001',
     'http://24.152.36.55:3000',  // IP público da VPS - frontend
-    'http://24.152.36.55:3001'   // IP público da VPS - backend (caso necessário)
+    'http://24.152.36.55:3001',  // IP público da VPS - backend (caso necessário)
+    'https://pagamentoseguromarketplace.com',  // Domínio HTTPS - frontend
+    'https://www.pagamentoseguromarketplace.com'  // Domínio HTTPS - www
   ],
   credentials: true
 }));

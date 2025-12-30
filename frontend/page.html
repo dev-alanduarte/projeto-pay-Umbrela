@@ -1097,14 +1097,26 @@
                     }
                     
                     // Configura a URL da API do backend
-                    // Frontend roda na porta 3000, backend na porta 3001
-                    // Sempre usa o backend na porta 3001 (mesmo em produção)
+                    // Em desenvolvimento: usa localhost:3001
+                    // Em produção via IP: usa IP:3001
+                    // Em produção via domínio HTTPS: usa o mesmo domínio (Nginx faz proxy)
                     const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                    const backendUrl = isDev 
-                        ? 'http://localhost:3001' 
-                        : `${window.location.protocol}//${window.location.hostname}:3001`;
+                    const isHttps = window.location.protocol === 'https:';
+                    const isIpAddress = /^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname);
+                    
+                    let backendUrl;
+                    if (isDev) {
+                        backendUrl = 'http://localhost:3001';
+                    } else if (isHttps && !isIpAddress) {
+                        // HTTPS via domínio: usa o mesmo domínio (Nginx faz proxy para porta 3001)
+                        backendUrl = `${window.location.protocol}//${window.location.hostname}`;
+                    } else {
+                        // HTTP via IP: usa IP:3001 diretamente
+                        backendUrl = `${window.location.protocol}//${window.location.hostname}:3001`;
+                    }
                     
                     console.log('🔧 Backend URL:', backendUrl);
+                    console.log('🔧 Detecção:', { isDev, isHttps, isIpAddress, hostname: window.location.hostname });
                     
                     // Sempre usa POST na rota /pix (simplificado)
                     const apiUrl = `${backendUrl}/pix`;
