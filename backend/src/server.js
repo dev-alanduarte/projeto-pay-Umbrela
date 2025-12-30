@@ -304,11 +304,7 @@ app.post('/pix', async (req, res) => {
           'User-Agent': 'UMBRELLAB2B/1.0'
         },
         timeout: 15000, // 15 segundos
-        httpsAgent: new https.Agent({ 
-          keepAlive: true,
-          // Forçar IPv4 se necessário
-          family: 4
-        }),
+        httpsAgent: new https.Agent({ keepAlive: true }),
         validateStatus: function (status) {
           return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
         }

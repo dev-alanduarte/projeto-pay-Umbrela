@@ -1,12 +1,16 @@
+const path = require('path');
+
 module.exports = {
   apps: [
     {
       name: 'projeto-pay-umbrela-backend',
-      script: 'src/server.js',
-      cwd: './backend',
+      script: path.join(__dirname, 'backend', 'src', 'server.js'),
+      cwd: path.join(__dirname, 'backend'),
       interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
+      // IMPORTANTE: merge_env: true garante que variáveis do .env sejam carregadas
+      merge_env: true,
       env: {
         NODE_ENV: 'production',
         PORT: 3001
