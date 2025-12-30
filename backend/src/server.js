@@ -264,6 +264,7 @@ app.post('/pix', async (req, res) => {
     };
 
     console.log('📤 Payload para UmbrellaPag:', JSON.stringify(transactionPayload, null, 2));
+    console.log('🌐 Fazendo requisição para:', UMBRELLA_API_URL);
 
     // Chama API UmbrellaPag usando axios com retry em caso de timeout
     let umbrellaRes;
@@ -279,6 +280,7 @@ app.post('/pix', async (req, res) => {
             await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
           }
           
+          console.log(`📡 Tentativa ${attempt + 1}: Enviando requisição...`);
           umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
             headers: {
               'Content-Type': 'application/json',
