@@ -102,8 +102,8 @@ async function testDirect() {
       // Verificar se tem QR Code
       const data = response.data.data || response.data;
       const pixCode = data.qrCode || 
-                     data.pix?.qrcode || 
-                     data.pix?.qrCode ||
+                     (data.pix && data.pix.qrcode) || 
+                     (data.pix && data.pix.qrCode) ||
                      data.pixCode;
       
       if (pixCode) {
