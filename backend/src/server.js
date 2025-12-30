@@ -39,7 +39,14 @@ app.use(helmet({
   },
 }));
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://127.0.0.1:3001'],
+  origin: [
+    'http://localhost:3000', 
+    'http://127.0.0.1:3000', 
+    'http://localhost:3001', 
+    'http://127.0.0.1:3001',
+    'http://24.152.36.55:3000',  // IP público da VPS - frontend
+    'http://24.152.36.55:3001'   // IP público da VPS - backend (caso necessário)
+  ],
   credentials: true
 }));
 app.use(express.json({ limit: '1mb' }));
