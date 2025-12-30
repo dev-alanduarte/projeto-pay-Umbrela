@@ -24,9 +24,9 @@ async function testDirect() {
   console.log(`✅ API Key encontrada: ${UMBRELLA_TOKEN.substring(0, 8)}...`);
   console.log(`📡 URL: ${UMBRELLA_API_URL}\n`);
   
-  // Payload de teste (R$ 1,00)
+  // Payload de teste (R$ 12,00)
   const testPayload = {
-    amount: 100, // R$ 1,00 em centavos
+    amount: 1200, // R$ 12,00 em centavos
     currency: "BRL",
     paymentMethod: "PIX",
     installments: 1,
@@ -59,7 +59,7 @@ async function testDirect() {
     },
     items: [{
       title: "Teste PIX Direto",
-      unitPrice: 100,
+      unitPrice: 1200,
       quantity: 1,
       tangible: false,
       externalRef: `test_direct_${Date.now()}`
