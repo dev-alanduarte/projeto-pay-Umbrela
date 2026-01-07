@@ -1061,19 +1061,19 @@ async function checkPaymentStatus(transactionId) {
     let paidAt = null;
     
     // Tentar diferentes estruturas de resposta
-    if (response.data?.data?.data) {
+    if (response.data && response.data.data && response.data.data.data) {
       // Estrutura de transfer: { data: { data: { ... } } }
       transactionData = response.data.data.data;
-      status = transactionData?.status;
-    } else if (response.data?.data) {
+      status = transactionData && transactionData.status;
+    } else if (response.data && response.data.data) {
       // Estrutura de transaction: { data: { ... } }
       transactionData = response.data.data;
-      status = transactionData?.status;
-      paidAt = transactionData?.paidAt;
+      status = transactionData && transactionData.status;
+      paidAt = transactionData && transactionData.paidAt;
     } else if (response.data) {
       transactionData = response.data;
-      status = transactionData?.status;
-      paidAt = transactionData?.paidAt;
+      status = transactionData && transactionData.status;
+      paidAt = transactionData && transactionData.paidAt;
     }
     
     // Se data é null, a transação pode ainda não ter sido processada
@@ -1245,13 +1245,15 @@ app.get('/check-payment/:id', async (req, res) => {
     if (response.status >= 400) {
       return res.status(response.status).json({
         success: false,
-        error: response.data?.message || 'Erro ao verificar pagamento',
+        error: (response.data && response.data.message) || 'Erro ao verificar pagamento',
         data: response.data
       });
     }
 
-    const transferData = response.data?.data?.data || response.data?.data || response.data;
-    const status = transferData?.status;
+    const transferData = (response.data && response.data.data && response.data.data.data) || 
+                        (response.data && response.data.data) || 
+                        response.data;
+    const status = transferData && transferData.status;
 
     // Status possíveis: INPROCESS, COMPLETED, FAILED, etc.
     const isPaid = status === 'COMPLETED' || status === 'APPROVED' || status === 'PAID';
@@ -1269,7 +1271,7 @@ app.get('/check-payment/:id', async (req, res) => {
     if (error.response) {
       return res.status(error.response.status).json({
         success: false,
-        error: error.response.data?.message || 'Erro ao verificar pagamento',
+        error: (error.response.data && error.response.data.message) || 'Erro ao verificar pagamento',
         data: error.response.data
       });
     }
