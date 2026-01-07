@@ -45,6 +45,12 @@ const getAllowedOrigins = () => {
       'http://127.0.0.1:3000',
       'http://127.0.0.1:3001',
     ];
+  } else {
+    // Em produção, permitir o domínio de produção
+    allowedOrigins = [
+      'https://pagamentoseguromarketplace.com',
+      'https://www.pagamentoseguromarketplace.com',
+    ];
   }
 
   return allowedOrigins;
