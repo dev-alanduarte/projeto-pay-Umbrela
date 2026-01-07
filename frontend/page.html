@@ -1229,9 +1229,16 @@
                 });
 
                 socket.on('connect_error', (error) => {
+                    console.error(`[WebSocket] ❌ Erro de conexão:`, error);
+                    console.error(`[WebSocket] ❌ Detalhes:`, {
+                        message: error.message,
+                        type: error.type,
+                        description: error.description
+                    });
                     // Erro de conexão - tentar reconectar após alguns segundos
                     setTimeout(() => {
                         if (!socket || !socket.connected) {
+                            console.log(`[WebSocket] 🔄 Tentando reconectar...`);
                             startPaymentMonitoring(transactionId, backendUrl);
                         }
                     }, 5000);
