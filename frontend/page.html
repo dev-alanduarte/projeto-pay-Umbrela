@@ -1191,17 +1191,19 @@
 
             // Conectar ao WebSocket usando Socket.IO
             if (typeof io !== 'undefined') {
+                console.log(`[WebSocket] Conectando em: ${wsUrl}`);
                 socket = io(wsUrl, {
                     transports: ['websocket', 'polling']
                 });
 
                 socket.on('connect', () => {
+                    console.log(`[WebSocket] ✅ Conectado! Enviando monitor_payment para: ${transactionId}`);
                     // Solicitar monitoramento da transação
                     socket.emit('monitor_payment', { transactionId: transactionId });
                 });
 
                 socket.on('monitoring_started', (data) => {
-                    // Monitoramento iniciado
+                    console.log(`[WebSocket] ✅ Monitoramento iniciado:`, data);
                 });
 
                 socket.on('payment_status', (data) => {
