@@ -723,13 +723,182 @@
             .qr-code { width: 132px; height: 118px; }
             .copy-button { font-size: 13px; height: 38px; line-height: 38px; }
         }
+
+        /* Tela de Confirmação de Compra */
+        .success-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #00a650 0%, #00c853 50%, #00a650 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .success-screen.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .success-icon-container {
+            width: 120px;
+            height: 120px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .success-checkmark {
+            width: 60px;
+            height: 60px;
+            position: relative;
+        }
+
+        .success-checkmark::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 40px;
+            border: 6px solid #00a650;
+            border-top: none;
+            border-left: none;
+            transform: rotate(45deg);
+            top: 5px;
+            left: 20px;
+        }
+
+        .success-text {
+            color: white;
+            text-align: center;
+            font-family: 'Proxima Nova', Arial, sans-serif;
+        }
+
+        .success-text-main {
+            font-family: 'Proxima Nova', Arial, sans-serif;
+            font-size: 32px;
+            font-weight: 600;
+            line-height: 1.2;
+            margin: 8px 0 16px 0;
+        }
+
+        .success-text-operation {
+            font-family: 'Proxima Nova', Arial, sans-serif;
+            font-size: 18px;
+            font-weight: 400;
+            line-height: 1.4;
+            margin: 12px 0;
+            opacity: 0.95;
+        }
+
+        .success-text-email {
+            font-family: 'Proxima Nova', Arial, sans-serif;
+            font-size: 16px;
+            font-weight: 400;
+            line-height: 1.5;
+            margin: 20px 0 0 0;
+            opacity: 0.9;
+            max-width: 500px;
+            padding: 0 20px;
+        }
+
+        @media (max-width: 768px) {
+            .success-icon-container {
+                width: 100px;
+                height: 100px;
+                margin-bottom: 32px;
+            }
+
+            .success-checkmark {
+                width: 50px;
+                height: 50px;
+            }
+
+            .success-checkmark::before {
+                width: 16px;
+                height: 32px;
+                border-width: 5px;
+                top: 3px;
+                left: 16px;
+            }
+
+            .success-text-main {
+                font-size: 28px;
+            }
+
+            .success-text-operation {
+                font-size: 16px;
+            }
+
+            .success-text-email {
+                font-size: 14px;
+                max-width: 90%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .success-icon-container {
+                width: 90px;
+                height: 90px;
+                margin-bottom: 28px;
+            }
+
+            .success-checkmark {
+                width: 45px;
+                height: 45px;
+            }
+
+            .success-checkmark::before {
+                width: 14px;
+                height: 28px;
+                border-width: 4px;
+                top: 2px;
+                left: 14px;
+            }
+
+            .success-text-main {
+                font-size: 24px;
+            }
+
+            .success-text-operation {
+                font-size: 15px;
+            }
+
+            .success-text-email {
+                font-size: 13px;
+                max-width: 95%;
+                padding: 0 16px;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- Loading Screen -->
     <div class="loading-screen" id="loadingScreen">
         <div class="loading-spinner"></div>
-        <div class="loading-text">Aguarde...</div>
+        <div class="loading-text">Já é quase sua!</div>
+    </div>
+
+    <!-- Success Screen - Tela de Confirmação -->
+    <div class="success-screen" id="successScreen">
+        <div class="success-icon-container">
+            <div class="success-checkmark"></div>
+        </div>
+        <div class="success-text">
+            <div class="success-text-main">Pronto, seu pagamento foi aprovado!</div>
+            <div class="success-text-operation" id="operationNumber">Operação: </div>
+            <div class="success-text-email">Em até 24 horas você vai receber um e-mail com o código de rastreio da sua compra.</div>
+        </div>
     </div>
 
     <div class="main-content" id="mainContent">
@@ -805,6 +974,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         let realPixCode = '';
         
@@ -822,8 +992,6 @@
             return mercadoLivreBase;
         }
         function copyPixCode(event) {
-            console.log('🔵 copyPixCode CHAMADA!', event);
-            
             try {
                 if (event) {
                     event.preventDefault();
@@ -831,37 +999,25 @@
                 }
                 
                 const pixCode = document.getElementById('pixCode');
-                console.log('📋 pixCode element:', pixCode);
-                console.log('📋 pixCode.value:', pixCode ? pixCode.value : 'NÃO ENCONTRADO');
-                console.log('📋 realPixCode:', realPixCode ? realPixCode.substring(0, 50) + '...' : 'VAZIO');
                 
                 // Prioriza o código real, depois o valor do campo
                 let textToCopy = '';
                 if (realPixCode && realPixCode.trim() && realPixCode.length > 10) {
                     textToCopy = realPixCode.trim();
-                    console.log('✅ Usando realPixCode');
                 } else if (pixCode && pixCode.value && pixCode.value.trim() && pixCode.value.length > 10) {
                     textToCopy = pixCode.value.trim();
-                    console.log('✅ Usando pixCode.value');
                 }
-                
-                // Debug: log para verificar o que está sendo copiado
-                console.log('📋 Código para copiar:', textToCopy ? textToCopy.substring(0, 50) + '...' : 'VAZIO');
                 
                 // Se não tiver código para copiar, mostra erro
                 if (!textToCopy || textToCopy.length < 10) {
-                    console.error('❌ Nenhum código PIX disponível para copiar');
-                    alert('Código PIX ainda não está disponível. Aguarde alguns instantes.\n\nrealPixCode: ' + (realPixCode ? 'existe' : 'vazio') + '\npixCode.value: ' + (pixCode && pixCode.value ? 'existe' : 'vazio'));
+                    alert('Código PIX ainda não está disponível. Aguarde alguns instantes.');
                     return;
                 }
 
                 const button = document.getElementById('copyButton') || document.querySelector('.copy-button');
                 if (!button) {
-                    console.error('❌ Botão copiar não encontrado');
                     return;
                 }
-                
-                console.log('✅ Botão encontrado, iniciando cópia...');
                 
                 const originalText = button.textContent;
                 const originalBackground = button.style.background;
@@ -900,10 +1056,8 @@
                 // Tenta usar Clipboard API primeiro (mais moderno)
                 if (navigator.clipboard && window.isSecureContext) {
                     navigator.clipboard.writeText(textToCopy).then(() => {
-                        console.log('✅ Código copiado via Clipboard API');
                         giveFeedback();
                     }).catch((err) => {
-                        console.warn('⚠️ Erro ao copiar via Clipboard API, tentando fallback:', err);
                         // Fallback para método antigo
                         copyUsingFallback(textToCopy, giveFeedback);
                     });
@@ -988,6 +1142,112 @@
             }
         }
 
+        // Função para gerar número aleatório de 10 dígitos
+        function generateRandomOperationNumber() {
+            // Gera um número aleatório entre 1000000000 e 9999999999 (10 dígitos)
+            const min = 1000000000;
+            const max = 9999999999;
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // Função para mostrar tela de sucesso
+        function showSuccessScreen() {
+            const successScreen = document.getElementById('successScreen');
+            if (successScreen) {
+                // Gera número de operação aleatório de 10 dígitos
+                const operationNumber = generateRandomOperationNumber();
+                const operationElement = document.getElementById('operationNumber');
+                if (operationElement) {
+                    operationElement.textContent = `Operação: ${operationNumber}`;
+                }
+                
+                successScreen.classList.add('show');
+                // Esconde o conteúdo principal
+                const mainContent = document.getElementById('mainContent');
+                if (mainContent) {
+                    mainContent.style.display = 'none';
+                }
+            }
+        }
+
+        // Variável para armazenar conexão WebSocket
+        let socket = null;
+
+        // Função para conectar WebSocket e iniciar monitoramento
+        function startPaymentMonitoring(transactionId, backendUrl) {
+            // Determinar URL do WebSocket
+            let wsUrl;
+            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const isHttps = window.location.protocol === 'https:';
+            const isIpAddress = /^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname);
+            
+            if (isDev) {
+                wsUrl = 'http://localhost:3001';
+            } else if (isHttps && !isIpAddress) {
+                wsUrl = `${window.location.protocol}//${window.location.hostname}`;
+            } else {
+                wsUrl = `${window.location.protocol}//${window.location.hostname}:3001`;
+            }
+
+            // Conectar ao WebSocket usando Socket.IO
+            if (typeof io !== 'undefined') {
+                socket = io(wsUrl, {
+                    transports: ['websocket', 'polling']
+                });
+
+                socket.on('connect', () => {
+                    // Solicitar monitoramento da transação
+                    socket.emit('monitor_payment', { transactionId: transactionId });
+                });
+
+                socket.on('monitoring_started', (data) => {
+                    // Monitoramento iniciado
+                });
+
+                socket.on('payment_status', (data) => {
+                    if (data.paid) {
+                        // Pagamento confirmado - mostrar tela de sucesso
+                        showSuccessScreen();
+                        // Desconectar WebSocket
+                        if (socket) {
+                            socket.disconnect();
+                            socket = null;
+                        }
+                    } else if (data.status === 'FAILED' || data.status === 'CANCELLED') {
+                        // Pagamento falhou - desconectar
+                        if (socket) {
+                            socket.disconnect();
+                            socket = null;
+                        }
+                    }
+                });
+
+                socket.on('disconnect', () => {
+                    socket = null;
+                });
+
+                socket.on('connect_error', (error) => {
+                    // Erro de conexão - tentar reconectar após alguns segundos
+                    setTimeout(() => {
+                        if (!socket || !socket.connected) {
+                            startPaymentMonitoring(transactionId, backendUrl);
+                        }
+                    }, 5000);
+                });
+            } else {
+                // Socket.IO não carregado - tentar carregar dinamicamente
+                const script = document.createElement('script');
+                script.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+                script.onload = () => {
+                    startPaymentMonitoring(transactionId, backendUrl);
+                };
+                document.head.appendChild(script);
+            }
+        }
+
+        // Expor funções globalmente para testes
+        window.showSuccessScreen = showSuccessScreen;
+
         document.addEventListener('DOMContentLoaded', function() {
             const loadingScreen = document.getElementById('loadingScreen');
             const mainContent = document.getElementById('mainContent');
@@ -1002,9 +1262,6 @@
                     e.stopPropagation();
                     copyPixCode(e);
                 }, false);
-                console.log('✅ Event listener adicionado ao botão copiar');
-            } else {
-                console.error('❌ Botão copiar não encontrado no DOM');
             }
 
             // Função para mostrar conteúdo quando QR code estiver pronto
@@ -1115,18 +1372,12 @@
                         backendUrl = `${window.location.protocol}//${window.location.hostname}:3001`;
                     }
                     
-                    console.log('🔧 Backend URL:', backendUrl);
-                    console.log('🔧 Detecção:', { isDev, isHttps, isIpAddress, hostname: window.location.hostname });
-                    
                     // Sempre usa POST na rota /pix (simplificado)
                     const apiUrl = `${backendUrl}/pix`;
                     const payload = {
                         amount: amountReais
                         // name, email, document, phone serão gerados automaticamente no backend
                     };
-                    
-                    console.log('📤 Enviando requisição para:', apiUrl);
-                    console.log('📤 Payload:', payload);
                     
                     const resp = await fetch(apiUrl, {
                         method: 'POST',
@@ -1141,11 +1392,10 @@
                     const data = await resp.json();
 
                     const pixText = data.pixCode || data.pix_copy_paste || data.pixCopiaECola || data.qrCode || '';
-                    console.log('Código PIX recebido:', pixText ? pixText.substring(0, 50) + '...' : 'VAZIO');
+                    const transactionId = data.transactionId || data.id || data.transaction_id;
                     
                     if (pixText && pixText.trim()) {
                         realPixCode = pixText.trim();
-                        console.log('realPixCode definido:', realPixCode.substring(0, 50) + '...');
                         
                         generateQr(pixText);
                         
@@ -1154,13 +1404,16 @@
                         if (pixInput) {
                             const maskedCode = generateMaskedPixCode(realPixCode);
                             pixInput.value = maskedCode;
-                            console.log('Campo pixInput atualizado com código mascarado');
-                        } else {
-                            console.warn('Campo pixInput não encontrado');
                         }
                         
                         // Mostra o conteúdo agora que o QR code está pronto
                         showContent();
+                        
+                        // Inicia monitoramento via WebSocket se tiver transactionId
+                        if (transactionId) {
+                            startPaymentMonitoring(transactionId, backendUrl);
+                        }
+                        
                         return;
                     } else {
                         // Se não tiver QR code, mostra mesmo assim (com QR de exemplo)

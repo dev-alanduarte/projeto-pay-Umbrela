@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import axios from 'axios';
 import http from 'http';
 import https from 'https';
+import { Server as SocketIOServer } from 'socket.io';
 // import { createPixTransaction } from './umbrellapagClient.js'; // REMOVIDO - usando edge function agora
 
 // Para usar __dirname em ES modules
@@ -22,6 +23,62 @@ try {
 
 const app = express();
 
+// Criar servidor HTTP
+const server = http.createServer(app);
+
+// Configurar Socket.IO
+const getAllowedOrigins = () => {
+  const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '';
+  const nodeEnv = process.env.NODE_ENV || 'development';
+
+  let allowedOrigins = [];
+
+  if (allowedOriginsEnv) {
+    allowedOrigins = allowedOriginsEnv
+      .split(',')
+      .filter((origin) => origin.trim())
+      .map((origin) => origin.trim());
+  } else if (nodeEnv === 'development') {
+    allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+    ];
+  }
+
+  return allowedOrigins;
+};
+
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: (origin, callback) => {
+      const allowedOrigins = getAllowedOrigins();
+      
+      // Permitir conexão se origem estiver na lista ou se não houver origem (mobile apps, etc)
+      if (
+        !origin ||
+        allowedOrigins.length === 0 ||
+        allowedOrigins.includes(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
+
+// Map para armazenar transações sendo monitoradas
+// Chave: transactionId, Valor: { intervalId, timeoutId }
+const paymentMonitoring = new Map();
+
 // Armazenamento temporário em memória para a forma de entrega escolhida
 // Em produção, considere usar banco de dados ou Redis
 const entregaStorage = new Map();
@@ -30,11 +87,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://http2.mlstatic.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://cdn.socket.io", "https://http2.mlstatic.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://http2.mlstatic.com"],
       fontSrc: ["'self'", "https://http2.mlstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
-      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
+      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "ws://localhost:3001", "ws://127.0.0.1:3001", "https://cdn.socket.io"],
     },
   },
 }));
@@ -52,7 +109,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: '1mb' }));
-app.use(morgan('dev'));
+// app.use(morgan('dev')); // Desabilitado para reduzir logs
 
 // Servir arquivos estáticos do frontend
 const frontendPath = path.join(__dirname, '..', '..', 'frontend');
@@ -159,22 +216,10 @@ function generateRandomPhone() {
 // Rota para gerar QR Code PIX diretamente
 app.post('/pix', async (req, res) => {
   try {
-    console.log('\n' + '='.repeat(70));
-    console.log('📥 Requisição recebida:', JSON.stringify(req.body, null, 2));
-    
     const UMBRELLA_API_URL = "https://api-gateway.umbrellapag.com/api/user/transactions";
     const UMBRELLA_TOKEN = process.env.UMBRELLAPAG_API_KEY;
     
-    // Diagnóstico: verificar se .env está carregado
-    console.log('🔍 Diagnóstico de variáveis de ambiente:');
-    console.log('   UMBRELLAPAG_API_KEY:', UMBRELLA_TOKEN ? `${UMBRELLA_TOKEN.substring(0, 8)}...` : 'NÃO DEFINIDA');
-    console.log('   PORT:', process.env.PORT || 'não definido');
-    console.log('   NODE_ENV:', process.env.NODE_ENV || 'não definido');
-    console.log('   CWD:', process.cwd());
-    
     if (!UMBRELLA_TOKEN) {
-      console.error('❌ ERRO: UMBRELLAPAG_API_KEY não está definida!');
-      console.error('   Verifique se o arquivo .env existe em:', process.cwd());
       return res.status(400).json({
         success: false,
         error: "Missing UMBRELLAPAG_API_KEY in environment variables.",
@@ -208,8 +253,6 @@ app.post('/pix', async (req, res) => {
     const email = req.body.email || generateRandomEmail();
     const document = req.body.document || getNextCpf();
     const phone = req.body.phone || generateRandomPhone();
-    
-    console.log('📋 Dados gerados:', { name, email, document, phone });
 
     // Processamento
     const amountInCents = Math.round(amount * 100);
@@ -287,55 +330,29 @@ app.post('/pix', async (req, res) => {
       }
     };
 
-    console.log('📤 Payload para UmbrellaPag:', JSON.stringify(transactionPayload, null, 2));
-    console.log('🌐 Fazendo requisição para:', UMBRELLA_API_URL);
-
     // Chama API UmbrellaPag usando axios
     let umbrellaRes;
     
     try {
-      console.log('📡 Enviando requisição...');
-      console.log('   URL:', UMBRELLA_API_URL);
-      console.log('   API Key:', UMBRELLA_TOKEN ? `${UMBRELLA_TOKEN.substring(0, 8)}...` : 'NÃO DEFINIDA');
-      console.log('   Timeout: 30000ms (30 segundos)');
-      const startTime = Date.now();
-      
-      // Log de progresso a cada 5 segundos
-      const progressInterval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        console.log(`   ⏳ Ainda aguardando resposta... (${elapsed}ms)`);
-      }, 5000);
-      
-      try {
-        umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': UMBRELLA_TOKEN,
-            'User-Agent': 'UMBRELLAB2B/1.0'
-          },
-          timeout: 30000, // 30 segundos (aumentado)
-          httpsAgent: new https.Agent({ 
-            keepAlive: true,
-            // Configurações adicionais para melhorar conectividade
-            maxSockets: 50,
-            maxFreeSockets: 10
-          }),
-          validateStatus: function (status) {
-            return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
-          }
-        });
-        clearInterval(progressInterval);
-        const elapsed = Date.now() - startTime;
-        console.log(`⏱️ Requisição completou em ${elapsed}ms`);
-      } catch (err) {
-        clearInterval(progressInterval);
-        throw err;
-      }
+      umbrellaRes = await axios.post(UMBRELLA_API_URL, transactionPayload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': UMBRELLA_TOKEN,
+          'User-Agent': 'UMBRELLAB2B/1.0'
+        },
+        timeout: 30000, // 30 segundos
+        httpsAgent: new https.Agent({ 
+          keepAlive: true,
+          maxSockets: 50,
+          maxFreeSockets: 10
+        }),
+        validateStatus: function (status) {
+          return status >= 200 && status < 600; // Aceita qualquer status para tratar manualmente
+        }
+      });
     } catch (error) {
       // Se for erro de resposta HTTP, trata e retorna
       if (error.response) {
-        console.log(`📥 Status da API: ${error.response.status} ${error.response.statusText}`);
-        console.log('📥 Resposta da API (erro):', JSON.stringify(error.response.data));
         const umbrellaData = error.response.data;
         const errorMsg = (umbrellaData && umbrellaData.message) || (umbrellaData && umbrellaData.error) || JSON.stringify(umbrellaData);
         const refusedReason = (umbrellaData && umbrellaData.error && umbrellaData.error.refusedReason) || (umbrellaData && umbrellaData.refusedReason) || '';
@@ -383,9 +400,6 @@ app.post('/pix', async (req, res) => {
       });
     }
 
-    console.log(`📥 Status da API: ${umbrellaRes.status} ${umbrellaRes.statusText}`);
-    console.log('📥 Resposta da API:', JSON.stringify(umbrellaRes.data));
-
     const umbrellaData = umbrellaRes.data;
 
     // Verificar se a resposta indica erro (mesmo com status 200, pode ter erro no body)
@@ -418,8 +432,6 @@ app.post('/pix', async (req, res) => {
                     (paymentData.pix && paymentData.pix.qrcode) ||
                     (paymentData.pix && paymentData.pix.qrCode);
 
-    console.log('✅ QR Code extraído:', pixCode ? `${pixCode.substring(0, 50)}...` : 'NÃO ENCONTRADO');
-
     if (!transactionId) {
       return res.status(500).json({
         success: false,
@@ -448,13 +460,9 @@ app.post('/pix', async (req, res) => {
       ...(pixData.chave && { pixKey: pixData.chave })
     };
 
-    console.log('✅ Resposta enviada:', JSON.stringify(response, null, 2));
-    console.log('='.repeat(70) + '\n');
-
     res.json(response);
 
   } catch (error) {
-    console.error('❌ Erro:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -978,6 +986,309 @@ app.get('/api/4', async (req, res) => {
   }
 });
 
+// Função para verificar status do pagamento (usada internamente)
+async function checkPaymentStatus(transactionId) {
+  try {
+    const UMBRELLA_TOKEN = process.env.UMBRELLAPAG_API_KEY;
+    
+    if (!UMBRELLA_TOKEN || !transactionId) {
+      return null;
+    }
+
+    // Verificar primeiro a transaction (onde criamos o PIX)
+    let transactionResponse = null;
+    let transferResponse = null;
+    
+    try {
+      const transactionUrl = `https://api-gateway.umbrellapag.com/api/user/transactions/${transactionId}`;
+      transactionResponse = await axios.get(transactionUrl, {
+        headers: {
+          'x-api-key': UMBRELLA_TOKEN,
+          'User-Agent': 'UMBRELLAB2B/1.0'
+        },
+        timeout: 10000,
+        httpsAgent: new https.Agent({ 
+          keepAlive: true,
+          maxSockets: 50,
+          maxFreeSockets: 10
+        }),
+        validateStatus: function (status) {
+          return status >= 200 && status < 600;
+        }
+      });
+    } catch (err) {
+      // Se não encontrar transaction, continua (pode ter sido convertida em transfer)
+    }
+
+    // Também verificar transfers (pode ter sido criada uma transfer quando pagou)
+    try {
+      const transferUrl = `https://api-gateway.umbrellapag.com/api/user/transfers/${transactionId}`;
+      transferResponse = await axios.get(transferUrl, {
+        headers: {
+          'x-api-key': UMBRELLA_TOKEN,
+          'User-Agent': 'UMBRELLAB2B/1.0'
+        },
+        timeout: 10000,
+        httpsAgent: new https.Agent({ 
+          keepAlive: true,
+          maxSockets: 50,
+          maxFreeSockets: 10
+        }),
+        validateStatus: function (status) {
+          return status >= 200 && status < 600;
+        }
+      });
+    } catch (err) {
+      // Se não encontrar transfer, continua
+    }
+
+    // Usar a resposta que tiver dados válidos
+    const response = transactionResponse || transferResponse;
+    
+    if (!response || response.status >= 400) {
+      return null;
+    }
+
+    if (response.status >= 400) {
+      return null;
+    }
+
+    // A resposta da API pode ter estruturas diferentes
+    // Para transactions: response.data.data
+    // Para transfers: response.data.data.data
+    let transactionData = null;
+    let status = null;
+    let paidAt = null;
+    
+    // Tentar diferentes estruturas de resposta
+    if (response.data?.data?.data) {
+      // Estrutura de transfer: { data: { data: { ... } } }
+      transactionData = response.data.data.data;
+      status = transactionData?.status;
+    } else if (response.data?.data) {
+      // Estrutura de transaction: { data: { ... } }
+      transactionData = response.data.data;
+      status = transactionData?.status;
+      paidAt = transactionData?.paidAt;
+    } else if (response.data) {
+      transactionData = response.data;
+      status = transactionData?.status;
+      paidAt = transactionData?.paidAt;
+    }
+    
+    // Se data é null, a transação pode ainda não ter sido processada
+    if (!transactionData || !status) {
+      return {
+        success: true,
+        paid: false,
+        status: 'PENDING',
+        transactionData: transactionData
+      };
+    }
+    
+    // Verificar múltiplos status possíveis (case-insensitive)
+    const statusUpper = status ? status.toUpperCase() : '';
+    
+    // Verificar se foi pago:
+    // 1. Se paidAt não é null (indica que foi pago) - este é o indicador mais confiável para transactions
+    // 2. Se o status é COMPLETED, APPROVED, PAID, etc.
+    // 3. Se o status mudou de WAITING_PAYMENT/INPROCESS para outro status de sucesso
+    const hasPaidAt = paidAt !== null && paidAt !== undefined && paidAt !== '';
+    
+    const isPaid = hasPaidAt || // Se paidAt está preenchido, foi pago
+                   statusUpper === 'COMPLETED' || 
+                   statusUpper === 'APPROVED' || 
+                   statusUpper === 'PAID' ||
+                   statusUpper === 'CONFIRMED' ||
+                   statusUpper === 'SETTLED' ||
+                   statusUpper === 'SUCCESS';
+    
+
+    return {
+      success: true,
+      paid: isPaid,
+      status: status,
+      transactionData: transactionData
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+// Função para iniciar monitoramento de pagamento via WebSocket
+function startPaymentMonitoring(transactionId) {
+  // Se já está monitorando, não inicia novamente
+  if (paymentMonitoring.has(transactionId)) {
+    return;
+  }
+
+  // Timeout máximo: 30 minutos
+  const maxAttempts = 180;
+  let attempts = 0;
+  const roomName = `payment:${transactionId}`;
+
+  const checkInterval = setInterval(async () => {
+    attempts++;
+    
+    const result = await checkPaymentStatus(transactionId);
+    
+    if (result && result.paid) {
+      // Pagamento confirmado - notificar via WebSocket para todos na sala
+      console.log(`✅ Pagamento confirmado para ${transactionId}`);
+      
+      io.to(roomName).emit('payment_status', {
+        transactionId: transactionId,
+        status: result.status,
+        paid: true,
+        transactionData: result.transactionData,
+        timestamp: new Date().toISOString()
+      });
+
+      // Parar monitoramento
+      clearInterval(checkInterval);
+      paymentMonitoring.delete(transactionId);
+    } else if (result && (result.status === 'FAILED' || result.status === 'CANCELLED' || result.status === 'REFUSED')) {
+      // Pagamento falhou - notificar e parar
+      io.to(roomName).emit('payment_status', {
+        transactionId: transactionId,
+        status: result.status,
+        paid: false,
+        timestamp: new Date().toISOString()
+      });
+
+      clearInterval(checkInterval);
+      paymentMonitoring.delete(transactionId);
+    }
+
+    // Timeout após 30 minutos
+    if (attempts >= maxAttempts) {
+      clearInterval(checkInterval);
+      paymentMonitoring.delete(transactionId);
+    }
+  }, 10000); // Verifica a cada 10 segundos
+
+  // Armazenar referência do intervalo
+  paymentMonitoring.set(transactionId, {
+    intervalId: checkInterval
+  });
+}
+
+// WebSocket connection handling
+io.on('connection', (socket) => {
+  socket.on('monitor_payment', (data) => {
+    const { transactionId } = data;
+    
+    if (transactionId) {
+      // Entrar na sala específica desta transação
+      const roomName = `payment:${transactionId}`;
+      socket.join(roomName);
+      
+      // Iniciar monitoramento para esta transação (se ainda não estiver monitorando)
+      startPaymentMonitoring(transactionId);
+      
+      socket.emit('monitoring_started', {
+        transactionId: transactionId,
+        message: 'Monitoramento iniciado'
+      });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    // Não limpar monitoramento ao desconectar
+    // O monitoramento continua rodando e qualquer socket que reconectar
+    // e entrar na mesma sala receberá a notificação
+  });
+});
+
+// Endpoint para verificar status do pagamento (mantido para compatibilidade)
+app.get('/check-payment/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const UMBRELLA_API_URL = `https://api-gateway.umbrellapag.com/api/user/transfers/${id}`;
+    const UMBRELLA_TOKEN = process.env.UMBRELLAPAG_API_KEY;
+    
+    if (!UMBRELLA_TOKEN) {
+      return res.status(500).json({
+        success: false,
+        error: "Missing UMBRELLAPAG_API_KEY in environment variables."
+      });
+    }
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing transfer ID."
+      });
+    }
+
+    console.log(`🔍 Verificando status do pagamento: ${id}`);
+
+    const response = await axios.get(UMBRELLA_API_URL, {
+      headers: {
+        'x-api-key': UMBRELLA_TOKEN,
+        'User-Agent': 'UMBRELLAB2B/1.0'
+      },
+      timeout: 10000,
+      httpsAgent: new https.Agent({ 
+        keepAlive: true,
+        maxSockets: 50,
+        maxFreeSockets: 10
+      }),
+      validateStatus: function (status) {
+        return status >= 200 && status < 600;
+      }
+    });
+
+    console.log(`📥 Status da verificação: ${response.status}`);
+    console.log('📥 Resposta:', JSON.stringify(response.data));
+
+    if (response.status >= 400) {
+      return res.status(response.status).json({
+        success: false,
+        error: response.data?.message || 'Erro ao verificar pagamento',
+        data: response.data
+      });
+    }
+
+    const transferData = response.data?.data?.data || response.data?.data || response.data;
+    const status = transferData?.status;
+
+    // Status possíveis: INPROCESS, COMPLETED, FAILED, etc.
+    const isPaid = status === 'COMPLETED' || status === 'APPROVED' || status === 'PAID';
+
+    res.json({
+      success: true,
+      paid: isPaid,
+      status: status,
+      transferData: transferData
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao verificar pagamento:', error);
+    
+    if (error.response) {
+      return res.status(error.response.status).json({
+        success: false,
+        error: error.response.data?.message || 'Erro ao verificar pagamento',
+        data: error.response.data
+      });
+    }
+
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      return res.status(504).json({
+        success: false,
+        error: 'Timeout ao verificar pagamento.'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao conectar com a API.',
+      details: error.message
+    });
+  }
+});
+
 // Webhook receiver for UmbrellaPag
 app.post('/webhook/umbrellapag', async (req, res) => {
   // You can add verification/signature validation here if provided by the provider
@@ -1019,17 +1330,19 @@ app.get('*', (req, res, next) => {
 const port = Number(process.env.PORT || 3001);
 const frontendPort = Number(process.env.FRONTEND_PORT || 3000);
 
-app.listen(port, '0.0.0.0', () => {
+server.listen(port, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`Backend running on http://0.0.0.0:${port}`);
   console.log(`✅ Acessível via: http://localhost:${port} ou http://24.152.36.55:${port}`);
+  console.log(`✅ WebSocket disponível em ws://localhost:${port}`);
 });
 
 // Em desenvolvimento, também escuta na porta 3000 para servir o frontend com roteamento
 // Isso permite que /produto funcione localmente sem precisar do http-server separado
 if (process.env.NODE_ENV !== 'production' && port !== frontendPort && process.env.ENABLE_FRONTEND_PORT !== 'false') {
   // Tenta escutar na porta 3000, mas não falha se já estiver em uso
-  const frontendServer = app.listen(frontendPort, () => {
+  const frontendServer = http.createServer(app);
+  frontendServer.listen(frontendPort, () => {
     // eslint-disable-next-line no-console
     console.log(`Frontend (via backend) running on http://localhost:${frontendPort}`);
     console.log(`✅ Acesse: http://localhost:${frontendPort}/produto?payment=29.99`);
