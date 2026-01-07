@@ -97,7 +97,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://http2.mlstatic.com"],
       fontSrc: ["'self'", "https://http2.mlstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
-      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "ws://localhost:3001", "ws://127.0.0.1:3001", "https://cdn.socket.io"],
+      connectSrc: ["'self'", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "ws://localhost:3001", "ws://127.0.0.1:3001", "wss://pagamentoseguromarketplace.com", "https://pagamentoseguromarketplace.com", "https://cdn.socket.io"],
     },
   },
 }));
